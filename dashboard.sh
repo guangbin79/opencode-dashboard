@@ -82,8 +82,17 @@ dash_main() {
       quit)
         break
         ;;
+      noop)
+        ;;
       view:sessions)
         CURRENT_VIEW="sessions"
+        ;;
+      view:detail)
+        if [[ -n "$CURRENT_SESSION_ID" ]]; then
+          CURRENT_VIEW="detail"
+        else
+          CURRENT_VIEW="sessions"
+        fi
         ;;
       view:detail:*)
         CURRENT_SESSION_ID="${result#view:detail:}"

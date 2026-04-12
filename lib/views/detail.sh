@@ -305,7 +305,7 @@ view_detail() {
       --color="$fzf_colors" \
       --delimiter='\t' \
       --with-nth='9,10,11,12' \
-      --expect=Enter,b,Backspace,1,3,4,q \
+      --expect=Enter,b,Backspace,1,2,3,4,q \
       --preview="$preview_cmd" \
       --preview-window='right:65%:wrap' \
       --bind='j:down' \
@@ -324,6 +324,7 @@ view_detail() {
     Enter) echo "back" ;;
     b|Backspace) echo "back" ;;
     1) echo "view:sessions" ;;
+    2) echo "noop" ;;
     3) echo "view:agents" ;;
     4) echo "view:todos" ;;
     *) echo "quit" ;;

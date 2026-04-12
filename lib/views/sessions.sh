@@ -175,7 +175,7 @@ view_sessions() {
       --color="$fzf_colors" \
       --delimiter='\t' \
       --with-nth=10,11,12,13 \
-      --expect=Enter,1,3,4,q \
+      --expect=Enter,1,2,3,4,q \
       --preview="$preview_cmd" \
       --preview-window='right:60%:wrap' \
       --bind='j:down,k:up' \
@@ -192,7 +192,7 @@ view_sessions() {
   selection=$(printf '%s' "$fzf_output" | tail -n +2)
 
   case "$key" in
-    Enter)
+    Enter|2)
       if [[ -n "$selection" ]]; then
         local selected_id
         selected_id=$(printf '%s' "$selection" | head -1 | cut -f1)

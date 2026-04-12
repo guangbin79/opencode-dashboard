@@ -120,7 +120,7 @@ view_todos() {
       fi
       ;;
     1) echo "view:sessions" ;;
-    2) echo "view:sessions" ;;
+    2) echo "view:detail" ;;
     3) echo "view:agents" ;;
     *) echo "quit" ;;
   esac

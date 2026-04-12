@@ -72,7 +72,7 @@ view_agents() {
   key=$(head -1 <<< "$result")
   case "$key" in
     1) echo "view:sessions" ;;
-    2) echo "view:sessions" ;;
+    2) echo "view:detail" ;;
     4) echo "view:todos" ;;
     Enter) echo "view:agents" ;;
     *) echo "quit" ;;
