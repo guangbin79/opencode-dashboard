@@ -181,16 +181,23 @@ def cmd_sessions(args):
         agents = agent_map.get(sid, [])
         agent_str = ",".join(sorted(set(agents)))[:40]
         rel_time = format_relative_time(row["time_updated"])
+        project_name = row["project_name"]
+        directory = row["directory"]
+        if not project_name and directory:
+            project_name = os.path.basename(directory.rstrip("/"))
+        title = row["title"] or ""
+        is_subagent = "1" if "(@" in title else "0"
         print_tsv_row(
             [
                 sid,
-                row["title"],
-                row["project_name"],
-                row["directory"],
+                title,
+                project_name,
+                directory,
                 row["msg_count"],
                 agent_str,
                 rel_time,
                 row["slug"],
+                is_subagent,
             ]
         )
 

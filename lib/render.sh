@@ -175,19 +175,58 @@ n_separator() {
 }
 
 # Print top navigation header bar
-# Usage: n_header_bar "Sessions" "Sessions" "Detail" "Agents" "Todos"
+# Usage: n_header_bar "Sessions"
 n_header_bar() {
-  local active_view="${1}"
-  shift
-  local i=1
-  local tab
-  for tab in "$@"; do
-    if [[ "${tab}" == "${active_view}" ]]; then
-      printf '%s%s%s[%d %s]%s' "${N_BG}" "${N_BOLD}" "${N_CYAN}" "${i}" "${tab}" "${N_RESET}"
+  local active="${1}"
+  local -a names=("Sessions" "Detail" "Agents" "Todos")
+  local i tabs=""
+  for i in 0 1 2 3; do
+    local name="${names[$i]}"
+    local num=$((i + 1))
+    if [[ "${name}" == "${active}" ]]; then
+      tabs="${tabs}${N_BG}${N_BOLD}${N_CYAN} [${num} ${name}] ${N_RESET}"
     else
-      printf '%s[%d %s]%s' "${N_DIM}" "${i}" "${tab}" "${N_RESET}"
+      tabs="${tabs}${N_DIM}[${num}]${N_RESET} ${N_FG}${name}${N_RESET}  "
     fi
-    printf '  '
-    i=$((i + 1))
   done
+  tabs="${tabs}   ${N_DIM}[q]uit [?]help${N_RESET}"
+  printf '%s' "${tabs}"
+}
+
+# Print context-sensitive help bar
+# Usage: n_help_bar "sessions"
+n_help_bar() {
+  local view="${1}"
+  local help
+  case "${view}" in
+    sessions) help='[Enter] open  [j/k] scroll  [/] search  [1-4] views  [q] quit' ;;
+    detail)   help='[Enter] expand  [b] back  [j/k] scroll  [1-4] views  [q] quit' ;;
+    agents)   help='[Enter] details  [j/k] scroll  [/] search  [1-4] views  [q] quit' ;;
+    todos)    help='[Enter] go to session  [j/k] scroll  [/] search  [1-4] views  [q] quit' ;;
+    *)        help='[j/k] scroll  [/] search  [1-4] views  [q] quit' ;;
+  esac
+  printf '%s%s%s' "${N_DIM}" "${help}" "${N_RESET}"
+}
+
+# Align text within a fixed width
+# Usage: n_align "hello" 20 "left"
+n_align() {
+  local text="${1}"
+  local width="${2}"
+  local align="${3:-left}"
+  local len=${#text}
+  if (( len > width )); then
+    text="${text:0:${width}}"
+    len=${width}
+  fi
+  case "${align}" in
+    right) printf '%*s' "${width}" "${text}" ;;
+    *)     printf '%-*s' "${width}" "${text}" ;;
+  esac
+}
+
+# Wrap column header text in frost color
+# Usage: n_column_header "Name"
+n_column_header() {
+  printf '%s%s%s' "${N_FROST}" "${1}" "${N_RESET}"
 }
