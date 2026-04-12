@@ -262,7 +262,16 @@ def cmd_session_meta(args):
     result = {
         "id": session["id"],
         "title": session["title"],
-        "project": session["project_name"] or session["project_worktree"] or "",
+        "project": (
+            session["project_name"]
+            or (
+                os.path.basename(session["directory"].rstrip("/"))
+                if session["directory"]
+                else None
+            )
+            or session["project_worktree"]
+            or ""
+        ),
         "directory": session["directory"],
         "slug": session["slug"],
         "version": session["version"],

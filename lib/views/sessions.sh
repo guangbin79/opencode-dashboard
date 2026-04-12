@@ -26,6 +26,9 @@ _sessions_format_preview() {
 
   title=$(printf '%s' "$json" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('title',''))" 2>/dev/null)
   project=$(printf '%s' "$json" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('project',''))" 2>/dev/null)
+  if [[ -z "$project" || "$project" == "/" ]]; then
+    project=$(printf '%s' "$json" | python3 -c "import sys,json,os; d=json.load(sys.stdin); print(os.path.basename(d.get('directory','').rstrip('/')))" 2>/dev/null)
+  fi
   directory=$(printf '%s' "$json" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('directory',''))" 2>/dev/null)
   slug=$(printf '%s' "$json" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('slug',''))" 2>/dev/null)
   version=$(printf '%s' "$json" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('version',''))" 2>/dev/null)
@@ -113,15 +116,23 @@ view_sessions() {
   [[ -f "$SCRIPT_DIR/lib/render.sh" ]] && source "$SCRIPT_DIR/lib/render.sh"
 
   local session_data
-  session_data=$(python3 "$data_py" sessions --limit 100 --active --sort updated 2>/dev/null)
+  session_data=$(python3 "$data_py" sessions --limit 200 --active --sort updated 2>/dev/null)
   if [[ $? -ne 0 || -z "$session_data" ]]; then
     echo "quit"
     return 0
   fi
 
+  # Filter to main sessions only (is_subagent=0, column 9 in TSV)
+  local filtered_data
+  filtered_data=$(printf '%s\n' "$session_data" | awk -F'\t' '$9 == "0"')
+  if [[ -z "$filtered_data" ]]; then
+    filtered_data="$session_data"
+  fi
+
   local CYAN=$'\033[38;2;136;192;208m'
   local BRIGHT=$'\033[38;2;236;239;244m'
   local DIM=$'\033[38;2;76;86;106m'
+  local GREEN=$'\033[38;2;163;190;140m'
   local RESET=$'\033[0m'
 
   # TSV: 1=session_id 2=title 3=project_name 4=directory 5=msg_count 6=agents 7=updated_relative 8=slug 9=is_subagent
@@ -140,24 +151,21 @@ view_sessions() {
   preview_cmd="$SCRIPT_DIR/lib/views/sessions.sh _preview {1} '$escaped_data_py'"
 
   local header
-  header="$(n_header_bar "Sessions")"$'\n'"$(n_column_header "  Title                            Project               Msgs  Time")"
+  header="$(n_header_bar "Sessions")"$'\n'"$(n_column_header "  Title                          Project         Msgs Time")"
 
   local fzf_output
-  fzf_output=$(printf '%s\n' "$session_data" \
-    | awk -F'\t' -v cyan="$CYAN" -v bright="$BRIGHT" -v dim="$DIM" -v reset="$RESET" '
+  fzf_output=$(printf '%s\n' "$filtered_data" \
+    | awk -F'\t' -v cyan="$CYAN" -v green="$GREEN" -v bright="$BRIGHT" -v dim="$DIM" -v reset="$RESET" '
       BEGIN { OFS="\t" }
       {
         title = $2
-        if (length(title) > 38) title = substr(title, 1, 35) "..."
+        if (length(title) > 34) title = substr(title, 1, 31) "..."
         project = $3
-        if (length(project) > 20) project = substr(project, 1, 17) "..."
+        if (length(project) > 16) project = substr(project, 1, 13) "..."
         msgs = $5
         time = $7
-        sub_flag = $9
 
-        icon = (sub_flag == "1") ? dim " *" reset : "  "
-
-        display = icon " " cyan title reset "\t" dim project reset "\t" bright msgs reset "\t" dim time reset
+        display = "  " cyan title reset "\t" green project reset "\t" bright msgs reset "\t" dim time reset
 
         print $0 "\t" display
       }

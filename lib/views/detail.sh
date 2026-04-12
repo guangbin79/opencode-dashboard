@@ -265,13 +265,19 @@ view_detail() {
         tok_in = $5
         preview = $8
 
-        # Role icon
+        # Role-based icon and colors
         if (role == "user") {
-          icon = yellow ">" reset
+          icon = yellow "▶" reset
+          agent_color = yellow
+          preview_color = ""
         } else if (role == "assistant") {
-          icon = cyan "<" reset
+          icon = cyan "◀" reset
+          agent_color = cyan
+          preview_color = ""
         } else {
-          icon = dim "#" reset
+          icon = dim "◆" reset
+          agent_color = dim
+          preview_color = dim
         }
 
         # Shorten agent name: remove parenthetical
@@ -290,7 +296,7 @@ view_detail() {
         # Truncate preview
         if (length(preview) > 50) preview = substr(preview, 1, 47) "..."
 
-        display = " " icon " " cyan agent reset "\t" dim time reset "\t" dim tokens reset "\t" preview
+        display = " " icon " " agent_color agent reset "\t" dim time reset "\t" dim tokens reset "\t" preview_color preview reset
         print $0 "\t" display
       }
     ' \

@@ -46,7 +46,6 @@ view_agents() {
   separator_line=$'\t'"${N_DIM}──────────────────${N_RESET}"$'\t'"${N_DIM}──────${N_RESET}"$'\t'"${N_DIM}────────${N_RESET}"$'\t'"${N_DIM}────────${N_RESET}"$'\t'"${N_DIM}────${N_RESET}"
 
   local formatted=""
-  formatted="${header_line}"$'\n'"${separator_line}"$'\n'
   while IFS= read -r line; do
     [[ -z "$line" ]] && continue
     formatted="${formatted}$(_agent_format_line "$line")"$'\n'
@@ -63,7 +62,7 @@ view_agents() {
       --preview="python3 '${SCRIPT_DIR}/lib/views/_agent_preview.py' {1} '${SCRIPT_DIR}/lib/data.py'" \
       --preview-window='right:60%:wrap' \
       --bind='j:down,k:up' \
-      --header="$(n_header_bar "Agents")"$'\n'"$(n_help_bar agents)" \
+      --header="$(n_header_bar "Agents")"$'\n'"$(n_help_bar agents)"$'\n'"${header_line}"$'\n'"${separator_line}" \
       --no-multi \
       --reverse \
       --prompt='agents> ' \

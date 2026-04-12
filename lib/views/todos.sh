@@ -136,6 +136,13 @@ _todos_format_preview() {
   # shellcheck source=/dev/null
   [[ -z "${N_CYAN:-}" ]] && source "$_VIEW_TODOS_DIR/../render.sh"
 
+  # Guard: skip preview for separator lines (not valid session IDs)
+  if [[ -z "$session_id" || "$session_id" != ses_* ]]; then
+    printf '\n'
+    printf '  %sSelect a todo item to see session details%s\n' "$N_DIM" "$N_RESET"
+    return
+  fi
+
   local json
   json=$(python3 "$data_py" session-meta "$session_id" 2>/dev/null)
   if [[ -z "$json" ]]; then
