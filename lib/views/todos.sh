@@ -93,7 +93,7 @@ view_todos() {
       --color="$FZF_NORD_COLORS" \
       --delimiter='\t' \
       --with-nth=8,9,10,11,12 \
-      --expect=Enter,1,2,3,q \
+      --expect=Enter,l,1,2,3,q \
       --preview="$preview_cmd" \
       --preview-window='right:55%:wrap' \
       --bind='j:down,k:up' \
@@ -110,7 +110,7 @@ view_todos() {
   selection=$(printf '%s' "$result" | tail -n +2)
 
   case "$key" in
-    Enter)
+    Enter|l)
       if [[ -n "$selection" ]]; then
         local session_id
         session_id=$(printf '%s' "$selection" | head -1 | cut -f1)

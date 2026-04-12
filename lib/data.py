@@ -197,7 +197,7 @@ def cmd_sessions(args):
             last_role_map[row["session_id"]] = row["role"]
 
     now_ms = int(time.time() * 1000)
-
+    output_rows = []
     for row in rows:
         sid = row["id"]
         agents = agent_map.get(sid, [])
@@ -221,20 +221,29 @@ def cmd_sessions(args):
         else:
             status = "idle"
 
-        print_tsv_row(
-            [
-                sid,
-                title,
+        output_rows.append(
+            (
                 project_name,
-                directory,
-                row["msg_count"],
-                agent_str,
-                rel_time,
-                row["slug"],
-                is_subagent,
-                status,
-            ]
+                row["time_updated"] or 0,
+                [
+                    sid,
+                    title,
+                    project_name,
+                    directory,
+                    row["msg_count"],
+                    agent_str,
+                    rel_time,
+                    row["slug"],
+                    is_subagent,
+                    status,
+                ],
+            )
         )
+
+    # Sort by project_name ASC, then time_updated DESC
+    output_rows.sort(key=lambda r: (r[0].lower(), -r[1]))
+    for _, _, fields in output_rows:
+        print_tsv_row(fields)
 
     conn.close()
 
@@ -774,6 +783,115 @@ def cmd_todo_stats(args):
     conn.close()
 
 
+def cmd_project_stats(args):
+    """List projects with session counts and status."""
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT
+            s.id, s.title, s.directory, s.time_updated,
+            COALESCE(NULLIF(p.name, ''), '') AS project_name
+        FROM session s
+        LEFT JOIN project p ON p.id = s.project_id
+        WHERE s.time_archived IS NULL
+        ORDER BY s.time_updated DESC
+    """)
+    rows = cursor.fetchall()
+
+    now_ms = int(time.time() * 1000)
+
+    from collections import OrderedDict
+
+    projects = OrderedDict()
+    for row in rows:
+        pn = row["project_name"]
+        if not pn:
+            pn = (
+                os.path.basename(row["directory"].rstrip("/"))
+                if row["directory"]
+                else "unknown"
+            )
+        title = row["title"] or ""
+        is_sub = "(@" in title
+        if is_sub:
+            continue
+
+        if pn not in projects:
+            projects[pn] = {
+                "name": pn,
+                "count": 0,
+                "updated": 0,
+                "running": 0,
+                "waiting": 0,
+                "latest_title": "",
+            }
+        p = projects[pn]
+        p["count"] += 1
+        if row["time_updated"] and row["time_updated"] > p["updated"]:
+            p["updated"] = row["time_updated"]
+            p["latest_title"] = title
+
+    # Get last role for each session to compute running/waiting
+    session_ids = [row["id"] for row in rows]
+    last_role_map = {}
+    if session_ids:
+        placeholders = ",".join("?" for _ in session_ids)
+        cursor.execute(
+            f"""
+            SELECT session_id, json_extract(data, '$.role') AS role
+            FROM message
+            WHERE id IN (
+                SELECT MAX(id) FROM message
+                WHERE session_id IN ({placeholders})
+                GROUP BY session_id
+            )
+            """,
+            session_ids,
+        )
+        for row in cursor.fetchall():
+            last_role_map[row["session_id"]] = row["role"]
+
+    for row in rows:
+        pn = row["project_name"]
+        if not pn:
+            pn = (
+                os.path.basename(row["directory"].rstrip("/"))
+                if row["directory"]
+                else "unknown"
+            )
+        title = row["title"] or ""
+        if "(@" in title:
+            continue
+        if pn not in projects:
+            continue
+        last_role = last_role_map.get(row["id"], "")
+        age_ms = now_ms - (row["time_updated"] or 0)
+        if last_role == "assistant" and age_ms < 10 * 60 * 1000:
+            projects[pn]["running"] += 1
+        elif last_role == "user" and age_ms < 24 * 3600 * 1000:
+            projects[pn]["waiting"] += 1
+
+    # Sort by updated DESC
+    sorted_projects = sorted(
+        projects.values(), key=lambda p: p["updated"], reverse=True
+    )
+    for p in sorted_projects:
+        rel_time = format_relative_time(p["updated"])
+        print_tsv_row(
+            [
+                p["name"],
+                p["count"],
+                p["running"],
+                p["waiting"],
+                rel_time,
+                p["latest_title"][:60],
+            ]
+        )
+
+    conn.close()
+
+
 def build_parser():
     """Build the argument parser with subcommands."""
     parser = argparse.ArgumentParser(
@@ -835,6 +953,10 @@ def build_parser():
 
     subparsers.add_parser("todo-stats", help="Todo counts by status and priority")
 
+    p_pstats = subparsers.add_parser(
+        "project-stats", help="Project list with session counts"
+    )
+
     return parser
 
 
@@ -856,6 +978,7 @@ def main():
         "agent-detail": cmd_agent_detail,
         "todos": cmd_todos,
         "todo-stats": cmd_todo_stats,
+        "project-stats": cmd_project_stats,
     }
 
     handler = command_map.get(args.command)

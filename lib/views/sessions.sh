@@ -7,6 +7,12 @@ _sessions_format_preview() {
   local session_id="$1"
   local data_py="$2"
 
+  if [[ -z "$session_id" || "$session_id" != ses_* ]]; then
+    printf '\n'
+    printf '  %sSelect a session to see details%s\n' "$N_DIM" "$N_RESET"
+    return
+  fi
+
   local json
   json=$(python3 "$data_py" session-meta "$session_id" 2>/dev/null)
   if [[ -z "$json" ]]; then
@@ -115,29 +121,23 @@ view_sessions() {
   # shellcheck source=/dev/null
   [[ -f "$SCRIPT_DIR/lib/render.sh" ]] && source "$SCRIPT_DIR/lib/render.sh"
 
-  local session_data
-  session_data=$(python3 "$data_py" sessions --limit 200 --active --sort updated 2>/dev/null)
-  if [[ $? -ne 0 || -z "$session_data" ]]; then
+  if [[ -n "${1:-}" ]]; then
+    _view_sessions_for_project "$1"
+    return $?
+  fi
+
+  _view_projects
+}
+
+_view_projects() {
+  local data_py="$SCRIPT_DIR/lib/data.py"
+
+  local project_data
+  project_data=$(python3 "$data_py" project-stats 2>/dev/null)
+  if [[ $? -ne 0 || -z "$project_data" ]]; then
     echo "quit"
     return 0
   fi
-
-  # Filter to main sessions only (is_subagent=0, column 9 in TSV)
-  local filtered_data
-  filtered_data=$(printf '%s\n' "$session_data" | awk -F'\t' '$9 == "0"')
-  if [[ -z "$filtered_data" ]]; then
-    filtered_data="$session_data"
-  fi
-
-  local CYAN=$'\033[38;2;136;192;208m'
-  local BRIGHT=$'\033[38;2;236;239;244m'
-  local DIM=$'\033[38;2;76;86;106m'
-  local GREEN=$'\033[38;2;163;190;140m'
-  local YELLOW=$'\033[38;2;235;203;139m'
-  local RESET=$'\033[0m'
-
-  # TSV: 1=session_id 2=title 3=project_name 4=directory 5=msg_count 6=agents 7=updated_relative 8=slug 9=is_subagent 10=status
-  # awk appends fields 11-15 as formatted display columns
 
   local fzf_colors
   if [[ -n "${FZF_NORD_COLORS:-}" ]]; then
@@ -146,53 +146,49 @@ view_sessions() {
     fzf_colors='fg:#D8DEE9,bg:#2E3440,hl:#88C0D0,fg+:#ECEFF4,bg+:#3B4252,hl+:#88C0D0,border:#434C5E,header:#5E81AC,gutter:#434C5E,spinner:#88C0D0,info:#81A1C1,pointer:#88C0D0,marker:#A3BE8C,prompt:#5E81AC,selected-bg:#434C5E'
   fi
 
-  local preview_cmd
-  local escaped_data_py
-  escaped_data_py=$(printf '%s' "$data_py" | sed "s/'/'\\\\''/g")
-  preview_cmd="$SCRIPT_DIR/lib/views/sessions.sh _preview {1} '$escaped_data_py'"
-
   local header
-  header="$(n_header_bar "Sessions")"$'\n'"$(n_column_header "  Title                          Project         Msgs Time")"
+  header="$(n_header_bar "Sessions")"$'\n'"$(n_column_header "  Project                    Sessions  Status          Updated")"
+
+  local colored_data=""
+  while IFS=$'\t' read -r pname count running waiting updated latest; do
+    [[ -z "$pname" ]] && continue
+
+    local status_str
+    if [[ "$running" -gt 0 ]] 2>/dev/null; then
+      status_str="${N_GREEN}● ${running} running${N_RESET}"
+    elif [[ "$waiting" -gt 0 ]] 2>/dev/null; then
+      status_str="${N_YELLOW}● ${waiting} waiting${N_RESET}"
+    else
+      status_str="${N_DIM}○ idle${N_RESET}"
+    fi
+
+    local p_trunc
+    p_trunc="$(n_truncate "$pname" 26)"
+
+    colored_data+="$(printf '%s\t%s\t%s\t%s\t%s\t%s' \
+      "$pname" \
+      "${N_CYAN}${p_trunc}${N_RESET}" \
+      "${N_BRIGHT}${count}${N_RESET}" \
+      "$status_str" \
+      "${N_DIM}${updated}${N_RESET}" \
+      "${N_DIM}${latest}${N_RESET}")"$'\n'
+  done <<< "$project_data"
 
   local fzf_output
-  fzf_output=$(printf '%s\n' "$filtered_data" \
-    | awk -F'\t' -v cyan="$CYAN" -v green="$GREEN" -v bright="$BRIGHT" -v dim="$DIM" -v reset="$RESET" -v yellow_status="$YELLOW" -v green_status="$GREEN" '
-      BEGIN { OFS="\t" }
-      {
-        status = $10
-        if (status == "running") {
-          status_icon = green_status "●" reset
-        } else if (status == "waiting") {
-          status_icon = yellow_status "●" reset
-        } else {
-          status_icon = dim "○" reset
-        }
-
-        title = $2
-        if (length(title) > 34) title = substr(title, 1, 31) "..."
-        project = $3
-        if (length(project) > 16) project = substr(project, 1, 13) "..."
-        msgs = $5
-        time = $7
-
-        display = status_icon " " cyan title reset "\t" green project reset "\t" bright msgs reset "\t" dim time reset
-
-        print $0 "\t" display
-      }
-    ' \
+  fzf_output=$(printf '%s' "$colored_data" \
     | fzf \
       --ansi \
       --color="$fzf_colors" \
       --delimiter='\t' \
-      --with-nth=11,12,13,14,15 \
-      --expect=Enter,1,2,3,4,q \
-      --preview="$preview_cmd" \
-      --preview-window='right:60%:wrap' \
+      --with-nth=2,3,4,5 \
+      --expect=Enter,l,1,2,3,4,q \
+      --preview="echo '${N_DIM}Press Enter/l to browse sessions in this project${N_RESET}'" \
+      --preview-window='right:50%:wrap' \
       --bind='j:down,k:up' \
       --header="$header" \
       --no-multi \
       --reverse \
-      --prompt='sessions> ' \
+      --prompt='projects> ' \
       --height=100% \
     2>/dev/null) || true
 
@@ -202,15 +198,114 @@ view_sessions() {
   selection=$(printf '%s' "$fzf_output" | tail -n +2)
 
   case "$key" in
-    Enter|2)
+    Enter|l)
+      if [[ -n "$selection" ]]; then
+        local selected_project
+        selected_project=$(printf '%s' "$selection" | head -1 | cut -f1)
+        echo "view:sessions:${selected_project}"
+      else
+        echo "quit"
+      fi
+      ;;
+    1) echo "view:sessions" ;;
+    2) echo "view:sessions" ;;
+    3) echo "view:agents" ;;
+    4) echo "view:todos" ;;
+    *) echo "quit" ;;
+  esac
+}
+
+_view_sessions_for_project() {
+  local project_name="$1"
+  local data_py="$SCRIPT_DIR/lib/data.py"
+
+  local session_data
+  session_data=$(python3 "$data_py" sessions --limit 200 --active --sort updated 2>/dev/null)
+  if [[ $? -ne 0 || -z "$session_data" ]]; then
+    echo "back"
+    return 0
+  fi
+
+  local filtered_data
+  filtered_data=$(printf '%s\n' "$session_data" | awk -F'\t' '$9 == "0" && $3 == "'"${project_name}""'")
+  if [[ -z "$filtered_data" ]]; then
+    filtered_data=$(printf '%s\n' "$session_data" | awk -F'\t' '$9 == "0" && $3 ~ /'"${project_name}"'/')
+  fi
+  if [[ -z "$filtered_data" ]]; then
+    echo "back"
+    return 0
+  fi
+
+  local fzf_colors
+  if [[ -n "${FZF_NORD_COLORS:-}" ]]; then
+    fzf_colors="$FZF_NORD_COLORS"
+  else
+    fzf_colors='fg:#D8DEE9,bg:#2E3440,hl:#88C0D0,fg+:#ECEFF4,bg+:#3B4252,hl+:#88C0D0,border:#434C5E,header:#5E81AC,gutter:#434C5E,spinner:#88C0D0,info:#81A1C1,pointer:#88C0D0,marker:#A3BE8C,prompt:#5E81AC,selected-bg:#434C5E'
+  fi
+
+  local escaped_data_py
+  escaped_data_py=$(printf '%s' "$data_py" | sed "s/'/'\\\\''/g")
+  local preview_cmd
+  preview_cmd="$SCRIPT_DIR/lib/views/sessions.sh _preview {1} '$escaped_data_py'"
+
+  local header
+  header="$(n_header_bar "Sessions")"$'\n'"$(n_column_header "  Title                              Msgs  Time")"$'\n'"${N_BOLD}${N_FROST}── ${project_name} ──${N_RESET}"
+
+  local colored_data=""
+  while IFS=$'\t' read -r sid title project_name directory msgs agents time_str slug is_sub sess_status; do
+    [[ -z "$sid" ]] && continue
+
+    local status_icon
+    case "$sess_status" in
+      running) status_icon="${N_GREEN}●${N_RESET}" ;;
+      waiting) status_icon="${N_YELLOW}●${N_RESET}" ;;
+      *)       status_icon="${N_DIM}○${N_RESET}" ;;
+    esac
+
+    local t_trunc
+    t_trunc="$(n_truncate "$title" 38)"
+
+    colored_data+="$(printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s' \
+      "$sid" "$title" "$project_name" "$directory" "$msgs" "$agents" "$time_str" "$slug" "$is_sub" "$sess_status" \
+      "$status_icon" "${N_CYAN}${t_trunc}${N_RESET}" \
+      "${N_DIM}${msgs}${N_RESET}" \
+      "${N_DIM}${time_str}${N_RESET}")"$'\n'
+  done <<< "$filtered_data"
+
+  local fzf_output
+  fzf_output=$(printf '%s' "$colored_data" \
+    | fzf \
+      --ansi \
+      --color="$fzf_colors" \
+      --delimiter='\t' \
+      --with-nth=11,12,13,14 \
+      --expect=Enter,l,b,Backspace,h,1,2,3,4,q \
+      --preview="$preview_cmd" \
+      --preview-window='right:60%:wrap' \
+      --bind='j:down,k:up' \
+      --header="$header" \
+      --no-multi \
+      --reverse \
+      --prompt="${project_name}> " \
+      --height=100% \
+    2>/dev/null) || true
+
+  local key
+  key=$(printf '%s' "$fzf_output" | head -1)
+  local selection
+  selection=$(printf '%s' "$fzf_output" | tail -n +2)
+
+  case "$key" in
+    Enter|l|2)
       if [[ -n "$selection" ]]; then
         local selected_id
         selected_id=$(printf '%s' "$selection" | head -1 | cut -f1)
         echo "view:detail:${selected_id}"
       else
-        echo "quit"
+        echo "view:sessions"
       fi
       ;;
+    b|Backspace|h) echo "view:sessions" ;;
     1) echo "view:sessions" ;;
     3) echo "view:agents" ;;
     4) echo "view:todos" ;;

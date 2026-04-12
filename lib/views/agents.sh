@@ -58,7 +58,7 @@ view_agents() {
       --color="$FZF_NORD_COLORS" \
       --delimiter='\t' \
       --with-nth=2.. \
-      --expect=Enter,1,2,4,q \
+      --expect=Enter,l,1,2,4,q \
       --preview="python3 '${SCRIPT_DIR}/lib/views/_agent_preview.py' {1} '${SCRIPT_DIR}/lib/data.py'" \
       --preview-window='right:60%:wrap' \
       --bind='j:down,k:up' \
@@ -74,7 +74,7 @@ view_agents() {
     1) echo "view:sessions" ;;
     2) echo "view:detail" ;;
     4) echo "view:todos" ;;
-    Enter) echo "view:agents" ;;
+    Enter|l) echo "view:agents" ;;
     *) echo "quit" ;;
   esac
   return 0

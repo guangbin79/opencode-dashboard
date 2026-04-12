@@ -199,10 +199,10 @@ n_help_bar() {
   local view="${1}"
   local help
   case "${view}" in
-    sessions) help='[Enter] open  [j/k] scroll  [/] search  [1-4] views  [q] quit' ;;
-    detail)   help='[Enter] expand  [b] back  [j/k] scroll  [1-4] views  [q] quit' ;;
-    agents)   help='[Enter] details  [j/k] scroll  [/] search  [1-4] views  [q] quit' ;;
-    todos)    help='[Enter] go to session  [j/k] scroll  [/] search  [1-4] views  [q] quit' ;;
+    sessions) help='[Enter/l] open  [h/b] back  [j/k] scroll  [/] search  [1-4] views  [q] quit' ;;
+    detail)   help='[h/b] back  [j/k] scroll  [1-4] views  [q] quit' ;;
+    agents)   help='[Enter/l] details  [j/k] scroll  [/] search  [1-4] views  [q] quit' ;;
+    todos)    help='[Enter/l] open  [h/b] back  [j/k] scroll  [/] search  [1-4] views  [q] quit' ;;
     *)        help='[j/k] scroll  [/] search  [1-4] views  [q] quit' ;;
   esac
   printf '%s%s%s' "${N_DIM}" "${help}" "${N_RESET}"

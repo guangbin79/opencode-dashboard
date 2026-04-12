@@ -57,12 +57,16 @@ dash_main() {
   local CURRENT_VIEW="sessions"
   local CURRENT_SESSION_ID=""
   local CURRENT_SESSION_TITLE=""
+  local CURRENT_SESSION_PROJECT=""
   local result=""
 
   while true; do
     case "$CURRENT_VIEW" in
       sessions)
         result=$(view_sessions)
+        ;;
+      sessions_project)
+        result=$(view_sessions "$CURRENT_SESSION_PROJECT")
         ;;
       detail)
         result=$(view_detail "$CURRENT_SESSION_ID" "$CURRENT_SESSION_TITLE")
@@ -86,6 +90,11 @@ dash_main() {
         ;;
       view:sessions)
         CURRENT_VIEW="sessions"
+        CURRENT_SESSION_PROJECT=""
+        ;;
+      view:sessions:*)
+        CURRENT_SESSION_PROJECT="${result#view:sessions:}"
+        CURRENT_VIEW="sessions_project"
         ;;
       view:detail)
         if [[ -n "$CURRENT_SESSION_ID" ]]; then
@@ -105,7 +114,12 @@ dash_main() {
         CURRENT_VIEW="todos"
         ;;
       back)
-        CURRENT_VIEW="sessions"
+        if [[ "$CURRENT_VIEW" == "detail" && -n "$CURRENT_SESSION_PROJECT" ]]; then
+          CURRENT_VIEW="sessions_project"
+        else
+          CURRENT_VIEW="sessions"
+          CURRENT_SESSION_PROJECT=""
+        fi
         ;;
     esac
   done
