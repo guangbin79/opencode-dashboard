@@ -22,6 +22,7 @@ import json
 import os
 import sqlite3
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -176,6 +177,27 @@ def cmd_sessions(args):
             sid = row["session_id"]
             agent_map.setdefault(sid, []).append(row["agent"])
 
+    # Get last message role per session
+    last_role_map = {}
+    if session_ids:
+        placeholders = ",".join("?" for _ in session_ids)
+        cursor.execute(
+            f"""
+            SELECT session_id, json_extract(data, '$.role') AS role
+            FROM message
+            WHERE id IN (
+                SELECT MAX(id) FROM message
+                WHERE session_id IN ({placeholders})
+                GROUP BY session_id
+            )
+            """,
+            session_ids,
+        )
+        for row in cursor.fetchall():
+            last_role_map[row["session_id"]] = row["role"]
+
+    now_ms = int(time.time() * 1000)
+
     for row in rows:
         sid = row["id"]
         agents = agent_map.get(sid, [])
@@ -187,6 +209,18 @@ def cmd_sessions(args):
             project_name = os.path.basename(directory.rstrip("/"))
         title = row["title"] or ""
         is_subagent = "1" if "(@" in title else "0"
+
+        last_role = last_role_map.get(sid, "")
+        time_updated = row["time_updated"] or 0
+        age_ms = now_ms - time_updated
+
+        if last_role == "assistant" and age_ms < 10 * 60 * 1000:
+            status = "running"
+        elif last_role == "user" and age_ms < 24 * 3600 * 1000:
+            status = "waiting"
+        else:
+            status = "idle"
+
         print_tsv_row(
             [
                 sid,
@@ -198,6 +232,7 @@ def cmd_sessions(args):
                 rel_time,
                 row["slug"],
                 is_subagent,
+                status,
             ]
         )
 

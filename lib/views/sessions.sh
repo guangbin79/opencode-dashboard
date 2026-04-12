@@ -133,10 +133,11 @@ view_sessions() {
   local BRIGHT=$'\033[38;2;236;239;244m'
   local DIM=$'\033[38;2;76;86;106m'
   local GREEN=$'\033[38;2;163;190;140m'
+  local YELLOW=$'\033[38;2;235;203;139m'
   local RESET=$'\033[0m'
 
-  # TSV: 1=session_id 2=title 3=project_name 4=directory 5=msg_count 6=agents 7=updated_relative 8=slug 9=is_subagent
-  # awk appends fields 10-13 as formatted display columns
+  # TSV: 1=session_id 2=title 3=project_name 4=directory 5=msg_count 6=agents 7=updated_relative 8=slug 9=is_subagent 10=status
+  # awk appends fields 11-15 as formatted display columns
 
   local fzf_colors
   if [[ -n "${FZF_NORD_COLORS:-}" ]]; then
@@ -155,9 +156,18 @@ view_sessions() {
 
   local fzf_output
   fzf_output=$(printf '%s\n' "$filtered_data" \
-    | awk -F'\t' -v cyan="$CYAN" -v green="$GREEN" -v bright="$BRIGHT" -v dim="$DIM" -v reset="$RESET" '
+    | awk -F'\t' -v cyan="$CYAN" -v green="$GREEN" -v bright="$BRIGHT" -v dim="$DIM" -v reset="$RESET" -v yellow_status="$YELLOW" -v green_status="$GREEN" '
       BEGIN { OFS="\t" }
       {
+        status = $10
+        if (status == "running") {
+          status_icon = green_status "●" reset
+        } else if (status == "waiting") {
+          status_icon = yellow_status "●" reset
+        } else {
+          status_icon = dim "○" reset
+        }
+
         title = $2
         if (length(title) > 34) title = substr(title, 1, 31) "..."
         project = $3
@@ -165,7 +175,7 @@ view_sessions() {
         msgs = $5
         time = $7
 
-        display = "  " cyan title reset "\t" green project reset "\t" bright msgs reset "\t" dim time reset
+        display = status_icon " " cyan title reset "\t" green project reset "\t" bright msgs reset "\t" dim time reset
 
         print $0 "\t" display
       }
@@ -174,7 +184,7 @@ view_sessions() {
       --ansi \
       --color="$fzf_colors" \
       --delimiter='\t' \
-      --with-nth=10,11,12,13 \
+      --with-nth=11,12,13,14,15 \
       --expect=Enter,1,2,3,4,q \
       --preview="$preview_cmd" \
       --preview-window='right:60%:wrap' \
