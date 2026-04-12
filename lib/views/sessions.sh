@@ -176,13 +176,18 @@ _view_projects() {
     colored_data+="$(printf '%s\t%s' "$pname" "$display")"$'\n'
   done <<< "$project_data"
 
-  if [[ -n "$last_project" && "$colored_data" == *"$last_project"* ]]; then
-    local selected_line rest_lines
+  if [[ -n "$last_project" && -n "$colored_data" ]]; then
+    local selected_line all_lines before_lines after_lines
     selected_line=$(printf '%s' "$colored_data" | grep -F "$last_project" | head -1) || true
-    rest_lines=$(printf '%s' "$colored_data" | grep -vF "$last_project") || true
     if [[ -n "$selected_line" ]]; then
-      colored_data="${selected_line}"$'\n'
-      [[ -n "$rest_lines" ]] && colored_data+="${rest_lines}"$'\n'
+      all_lines=$(printf '%s' "$colored_data" | grep -n -F "$last_project" | head -1 | cut -d: -f1) || true
+      if [[ -n "$all_lines" ]]; then
+        before_lines=$(printf '%s' "$colored_data" | head -n $((all_lines - 1))) || true
+        after_lines=$(printf '%s' "$colored_data" | tail -n +"$((all_lines + 1))") || true
+        colored_data="${selected_line}"$'\n'
+        [[ -n "$after_lines" ]] && colored_data+="${after_lines}"$'\n'
+        [[ -n "$before_lines" ]] && colored_data+="${before_lines}"$'\n'
+      fi
     fi
   fi
 
@@ -289,13 +294,18 @@ _view_sessions_for_project() {
       "$display")"$'\n'
   done <<< "$filtered_data"
 
-  if [[ -n "$last_session_id" && "$colored_data" == *"$last_session_id"* ]]; then
-    local selected_line rest_lines
+  if [[ -n "$last_session_id" && -n "$colored_data" ]]; then
+    local selected_line all_lines before_lines after_lines
     selected_line=$(printf '%s' "$colored_data" | grep -F "$last_session_id" | head -1) || true
-    rest_lines=$(printf '%s' "$colored_data" | grep -vF "$last_session_id") || true
     if [[ -n "$selected_line" ]]; then
-      colored_data="${selected_line}"$'\n'
-      [[ -n "$rest_lines" ]] && colored_data+="${rest_lines}"$'\n'
+      all_lines=$(printf '%s' "$colored_data" | grep -n -F "$last_session_id" | head -1 | cut -d: -f1) || true
+      if [[ -n "$all_lines" ]]; then
+        before_lines=$(printf '%s' "$colored_data" | head -n $((all_lines - 1))) || true
+        after_lines=$(printf '%s' "$colored_data" | tail -n +"$((all_lines + 1))") || true
+        colored_data="${selected_line}"$'\n'
+        [[ -n "$after_lines" ]] && colored_data+="${after_lines}"$'\n'
+        [[ -n "$before_lines" ]] && colored_data+="${before_lines}"$'\n'
+      fi
     fi
   fi
 
