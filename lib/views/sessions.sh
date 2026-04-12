@@ -147,7 +147,7 @@ _view_projects() {
   fi
 
   local header
-  header="$(n_header_bar "Sessions")"$'\n'"$(n_column_header "  Project                    Sessions  Status          Updated")"
+  header="$(n_header_bar "Sessions")"$'\n'"$(n_column_header "  Project                        Sessions  Status          Updated")"
 
   local colored_data=""
   while IFS=$'\t' read -r pname count running waiting updated latest; do
@@ -162,16 +162,17 @@ _view_projects() {
       status_str="${N_DIM}○ idle${N_RESET}"
     fi
 
-    local p_trunc
-    p_trunc="$(n_truncate "$pname" 26)"
+    local p_padded
+    p_padded="${N_CYAN}$(printf '%-28s' "$(n_truncate "$pname" 28)")${N_RESET}"
+    local c_padded
+    c_padded="${N_BRIGHT}$(printf '%5s' "$count")${N_RESET}"
+    local u_padded
+    u_padded="${N_DIM}$(printf '%-14s' "$updated")${N_RESET}"
 
-    colored_data+="$(printf '%s\t%s\t%s\t%s\t%s\t%s' \
-      "$pname" \
-      "${N_CYAN}${p_trunc}${N_RESET}" \
-      "${N_BRIGHT}${count}${N_RESET}" \
-      "$status_str" \
-      "${N_DIM}${updated}${N_RESET}" \
-      "${N_DIM}${latest}${N_RESET}")"$'\n'
+    local display
+    display=" ${p_padded} ${c_padded}  ${status_str}  ${u_padded}"
+
+    colored_data+="$(printf '%s\t%s' "$pname" "$display")"$'\n'
   done <<< "$project_data"
 
   local fzf_output
@@ -180,7 +181,7 @@ _view_projects() {
       --ansi \
       --color="$fzf_colors" \
       --delimiter='\t' \
-      --with-nth=2,3,4,5 \
+      --with-nth=2 \
       --expect=Enter,l,1,2,3,4,q \
       --preview="echo '${N_DIM}Press Enter/l to browse sessions in this project${N_RESET}'" \
       --preview-window='right:50%:wrap' \
@@ -249,7 +250,7 @@ _view_sessions_for_project() {
   preview_cmd="$SCRIPT_DIR/lib/views/sessions.sh _preview {1} '$escaped_data_py'"
 
   local header
-  header="$(n_header_bar "Sessions")"$'\n'"$(n_column_header "  Title                              Msgs  Time")"$'\n'"${N_BOLD}${N_FROST}── ${project_name} ──${N_RESET}"
+  header="$(n_header_bar "Sessions")"$'\n'"$(n_column_header "    Title                                   Msgs  Time")"$'\n'"${N_BOLD}${N_FROST}── ${project_name} ──${N_RESET}"
 
   local colored_data=""
   while IFS=$'\t' read -r sid title project_name directory msgs agents time_str slug is_sub sess_status; do
@@ -262,14 +263,18 @@ _view_sessions_for_project() {
       *)       status_icon="${N_DIM}○${N_RESET}" ;;
     esac
 
-    local t_trunc
-    t_trunc="$(n_truncate "$title" 38)"
+    local t_padded
+    t_padded="${N_CYAN}$(printf '%-38s' "$(n_truncate "$title" 38)")${N_RESET}"
+    local m_padded
+    m_padded="${N_DIM}$(printf '%4s' "$msgs")${N_RESET}"
 
-    colored_data+="$(printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s' \
+    local display
+    display=" ${status_icon}  ${t_padded} ${m_padded}  ${N_DIM}${time_str}${N_RESET}"
+
+    # TSV: raw fields 1-10, display field 11
+    colored_data+="$(printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s' \
       "$sid" "$title" "$project_name" "$directory" "$msgs" "$agents" "$time_str" "$slug" "$is_sub" "$sess_status" \
-      "$status_icon" "${N_CYAN}${t_trunc}${N_RESET}" \
-      "${N_DIM}${msgs}${N_RESET}" \
-      "${N_DIM}${time_str}${N_RESET}")"$'\n'
+      "$display")"$'\n'
   done <<< "$filtered_data"
 
   local fzf_output
@@ -278,7 +283,7 @@ _view_sessions_for_project() {
       --ansi \
       --color="$fzf_colors" \
       --delimiter='\t' \
-      --with-nth=11,12,13,14 \
+      --with-nth=11 \
       --expect=Enter,l,b,Backspace,h,1,2,3,4,q \
       --preview="$preview_cmd" \
       --preview-window='right:60%:wrap' \

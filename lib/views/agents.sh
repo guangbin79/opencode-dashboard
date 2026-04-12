@@ -17,21 +17,6 @@ _agent_color_name() {
   esac
 }
 
-# TSV input: agent(1) msgs(2) in_tok(3) out_tok(4) avg(5) sessions(6)
-_agent_format_line() {
-  local IFS=$'\t'
-  read -r c1 c2 c3 c4 _c5 c6 <<< "$1"
-  local colored_name
-  colored_name="$(_agent_color_name "$c1")"
-  printf '%s\t%s\t%s%s%s\t%s%s%s\t%s%s%s\t%s%s%s\n' \
-    "${c1}" \
-    "${colored_name}" \
-    "${N_BRIGHT}" "$(printf '%6s' "${c2}")" "${N_RESET}" \
-    "${N_BLUE}"   "$(printf '%8s' "${c3}")" "${N_RESET}" \
-    "${N_TEAL}"   "$(printf '%8s' "${c4}")" "${N_RESET}" \
-    "${N_DIM}"    "$(printf '%4s' "${c6}")" "${N_RESET}"
-}
-
 view_agents() {
   local data
   data=$(python3 "${SCRIPT_DIR}/lib/data.py" agent-stats --sort count 2>/dev/null)
@@ -41,14 +26,19 @@ view_agents() {
     return 0
   fi
 
-  local header_line separator_line
-  header_line=$'\t'"$(n_column_header "Agent")"$'\t'"$(n_column_header "  Msgs")"$'\t'"$(n_column_header "   Input")"$'\t'"$(n_column_header "  Output")"$'\t'"$(n_column_header "Sess")"
-  separator_line=$'\t'"${N_DIM}──────────────────${N_RESET}"$'\t'"${N_DIM}──────${N_RESET}"$'\t'"${N_DIM}────────${N_RESET}"$'\t'"${N_DIM}────────${N_RESET}"$'\t'"${N_DIM}────${N_RESET}"
-
   local formatted=""
-  while IFS= read -r line; do
-    [[ -z "$line" ]] && continue
-    formatted="${formatted}$(_agent_format_line "$line")"$'\n'
+  while IFS=$'\t' read -r agent_name count input_tokens output_tokens avg sessions; do
+    [[ -z "$agent_name" ]] && continue
+
+    local short_name="${agent_name%% (*}"
+    [[ ${#short_name} -gt 20 ]] && short_name="${short_name:0:17}..."
+    local visible_len=${#short_name}
+    local pad_spaces=$((20 - visible_len))
+
+    local display
+    display=" $(_agent_color_name "$short_name")$(printf '%*s' $pad_spaces '') ${N_BRIGHT}$(printf '%6s' "$count")${N_RESET}  ${N_DIM}$(printf '%12s' "$input_tokens")${N_RESET}  ${N_DIM}$(printf '%12s' "$output_tokens")${N_RESET} ${N_DIM}$(printf '%5s' "$sessions")${N_RESET}"
+
+    formatted+="$(printf '%s\t%s' "$agent_name" "$display")"$'\n'
   done <<< "$data"
 
   local result key
@@ -57,12 +47,12 @@ view_agents() {
       --ansi \
       --color="$FZF_NORD_COLORS" \
       --delimiter='\t' \
-      --with-nth=2.. \
+      --with-nth=2 \
       --expect=Enter,l,1,2,4,q \
       --preview="python3 '${SCRIPT_DIR}/lib/views/_agent_preview.py' {1} '${SCRIPT_DIR}/lib/data.py'" \
       --preview-window='right:60%:wrap' \
       --bind='j:down,k:up' \
-      --header="$(n_header_bar "Agents")"$'\n'"$(n_help_bar agents)"$'\n'"${header_line}"$'\n'"${separator_line}" \
+      --header="$(n_header_bar "Agents")"$'\n'"$(n_help_bar agents)"$'\n'"$(n_column_header " Agent                    Msgs        Input        Output Sess")" \
       --no-multi \
       --reverse \
       --prompt='agents> ' \

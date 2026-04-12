@@ -44,10 +44,10 @@ view_todos() {
 
     if [[ "$status" != "$last_status" ]]; then
       case "$status" in
-        in_progress) colored_data+="${N_DIM}-- In Progress (${ip_count}) --${N_RESET}"$'\n' ;;
-        pending)     colored_data+="${N_DIM}-- Pending (${p_count}) --${N_RESET}"$'\n' ;;
-        completed)   colored_data+="${N_DIM}-- Completed (${c_count}) --${N_RESET}"$'\n' ;;
-        cancelled)   colored_data+="${N_DIM}-- Cancelled (${x_count}) --${N_RESET}"$'\n' ;;
+        in_progress) colored_data+="$(printf '%s\t\t\t\t\t\t\t%s' '' "${N_DIM}── In Progress (${ip_count}) ──${N_RESET}")"$'\n' ;;
+        pending)     colored_data+="$(printf '%s\t\t\t\t\t\t\t%s' '' "${N_DIM}── Pending (${p_count}) ──${N_RESET}")"$'\n' ;;
+        completed)   colored_data+="$(printf '%s\t\t\t\t\t\t\t%s' '' "${N_DIM}── Completed (${c_count}) ──${N_RESET}")"$'\n' ;;
+        cancelled)   colored_data+="$(printf '%s\t\t\t\t\t\t\t%s' '' "${N_DIM}── Cancelled (${x_count}) ──${N_RESET}")"$'\n' ;;
       esac
       last_status="$status"
     fi
@@ -69,16 +69,17 @@ view_todos() {
       *)      picon="${N_DIM}?  ${N_RESET}" ;;
     esac
 
-    local c_trunc
-    c_trunc="$(n_truncate "$content" 45)"
-    local t_trunc
-    t_trunc="$(n_truncate "$session_title" 15)"
+    local c_padded
+    c_padded="$(printf '%-42s' "$(n_truncate "$content" 42)")"
+    local t_padded
+    t_padded="$(printf '%-16s' "$(n_truncate "$session_title" 16)")"
 
-    # TSV: raw fields 1-7, display fields 8-12
-    colored_data+="$(printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s' \
+    local display
+    display=" ${sicon} ${picon} ${c_padded} ${N_DIM}${t_padded}${N_RESET} ${N_DIM}$(printf '%-8s' "$created_rel")${N_RESET}"
+
+    colored_data+="$(printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s' \
       "$sid" "$status" "$priority" "$content" "$session_title" "$position" "$created_rel" \
-      "$sicon" "$picon" "${N_FG}${c_trunc}${N_RESET}" \
-      "${N_BLUE}${t_trunc}${N_RESET}" "${N_DIM}${created_rel}${N_RESET}")"$'\n'
+      "$display")"$'\n'
   done <<< "$data"
 
   # --- Preview command ---
@@ -92,7 +93,7 @@ view_todos() {
       --ansi \
       --color="$FZF_NORD_COLORS" \
       --delimiter='\t' \
-      --with-nth=8,9,10,11,12 \
+      --with-nth=8 \
       --expect=Enter,l,1,2,3,q \
       --preview="$preview_cmd" \
       --preview-window='right:55%:wrap' \

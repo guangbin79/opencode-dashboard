@@ -229,16 +229,9 @@ view_detail() {
     return 0
   fi
 
-  # Color constants for awk injection
-  local YELLOW='\033[38;2;235;203;139m'
-  local CYAN='\033[38;2;136;192;208m'
-  local DIM='\033[38;2;76;86;106m'
-  local RESET='\033[0m'
-
   local header
-  header="$(n_header_bar "Detail")"$'\n'"  ${session_title:-$session_id}"$'\n'"$(n_column_header "  Role  Agent               Time         Tokens  Summary")"
+  header="$(n_header_bar "Detail")"$'\n'"  ${session_title:-$session_id}"$'\n'"$(n_column_header "  Role  Agent                  Time         Tokens  Summary")"
 
-  # fzf color string
   local fzf_colors
   if [[ -n "${FZF_NORD_COLORS:-}" ]]; then
     fzf_colors="$FZF_NORD_COLORS"
@@ -252,59 +245,60 @@ view_detail() {
   local preview_cmd
   preview_cmd="$SCRIPT_DIR/lib/views/detail.sh _preview {1} '$escaped_data_py'"
 
-  # Data TSV: 1=message_id, 2=role, 3=agent, 4=time, 5=tokens_in,
-  #           6=tokens_out, 7=model, 8=preview
+  # Build display lines with fixed-width printf padding
+  local formatted=""
+  while IFS=$'\t' read -r mid role agent time_str tok_in tok_out model preview_text; do
+    [[ -z "$mid" ]] && continue
+
+    local role_icon agent_color preview_color
+    case "$role" in
+      user)
+        role_icon="${N_YELLOW}▶${N_RESET}"
+        agent_color="$N_YELLOW"
+        preview_color=""
+        ;;
+      assistant)
+        role_icon="${N_CYAN}◀${N_RESET}"
+        agent_color="$N_CYAN"
+        preview_color=""
+        ;;
+      *)
+        role_icon="${N_DIM}◆${N_RESET}"
+        agent_color="$N_DIM"
+        preview_color="$N_DIM"
+        ;;
+    esac
+
+    local short_agent="${agent%% (*}"
+    [[ ${#short_agent} -gt 20 ]] && short_agent="${short_agent:0:17}..."
+    local agent_visible_len=${#short_agent}
+    local agent_pad=$((20 - agent_visible_len))
+
+    local tokens_val
+    if [[ "$tok_in" -ge 1000 ]] 2>/dev/null; then
+      tokens_val="$((tok_in / 1000)).$(( (tok_in % 1000) / 100 ))k"
+    elif [[ "$role" == "user" ]]; then
+      tokens_val="-"
+    else
+      tokens_val="$tok_in"
+    fi
+
+    local trunc_preview="$preview_text"
+    [[ ${#trunc_preview} -gt 50 ]] && trunc_preview="${trunc_preview:0:47}..."
+
+    local display
+    display=" ${role_icon}  ${agent_color}${short_agent}${N_RESET}$(printf '%*s' $agent_pad '') ${N_DIM}$(printf '%-12s' "$time_str")${N_RESET} ${N_DIM}$(printf '%6s' "$tokens_val")${N_RESET}  ${preview_color}${trunc_preview}${N_RESET}"
+
+    formatted+="$(printf '%s\t%s' "$mid" "$display")"$'\n'
+  done <<< "$message_data"
+
   local fzf_output exit_code
-  fzf_output=$(printf '%s\n' "$message_data" \
-    | awk -F'\t' -v yellow="$YELLOW" -v cyan="$CYAN" -v dim="$DIM" -v reset="$RESET" '
-      BEGIN { OFS="\t" }
-      {
-        role = $2
-        agent = $3
-        time = $4
-        tok_in = $5
-        preview = $8
-
-        # Role-based icon and colors
-        if (role == "user") {
-          icon = yellow "▶" reset
-          agent_color = yellow
-          preview_color = ""
-        } else if (role == "assistant") {
-          icon = cyan "◀" reset
-          agent_color = cyan
-          preview_color = ""
-        } else {
-          icon = dim "◆" reset
-          agent_color = dim
-          preview_color = dim
-        }
-
-        # Shorten agent name: remove parenthetical
-        gsub(/ [(].*/, "", agent)
-        if (length(agent) > 20) agent = substr(agent, 1, 17) "..."
-
-        # Format tokens
-        if (tok_in+0 >= 1000) {
-          tokens = sprintf("%.1fk", tok_in/1000)
-        } else if (role == "user") {
-          tokens = "-"
-        } else {
-          tokens = tok_in
-        }
-
-        # Truncate preview
-        if (length(preview) > 50) preview = substr(preview, 1, 47) "..."
-
-        display = " " icon " " agent_color agent reset "\t" dim time reset "\t" dim tokens reset "\t" preview_color preview reset
-        print $0 "\t" display
-      }
-    ' \
+  fzf_output=$(printf '%s' "$formatted" \
     | fzf \
       --ansi \
       --color="$fzf_colors" \
       --delimiter='\t' \
-      --with-nth='9,10,11,12' \
+      --with-nth=2 \
       --expect=Enter,l,b,Backspace,h,1,2,3,4,q \
       --preview="$preview_cmd" \
       --preview-window='right:65%:wrap' \
