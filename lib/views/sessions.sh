@@ -122,14 +122,15 @@ view_sessions() {
   [[ -f "$SCRIPT_DIR/lib/render.sh" ]] && source "$SCRIPT_DIR/lib/render.sh"
 
   if [[ -n "${1:-}" ]]; then
-    _view_sessions_for_project "$1"
+    _view_sessions_for_project "$1" "${2:-}"
     return $?
   fi
 
-  _view_projects
+  _view_projects "${2:-}"
 }
 
 _view_projects() {
+  local last_project="${1:-}"
   local data_py="$SCRIPT_DIR/lib/data.py"
 
   local project_data
@@ -175,6 +176,16 @@ _view_projects() {
     colored_data+="$(printf '%s\t%s' "$pname" "$display")"$'\n'
   done <<< "$project_data"
 
+  if [[ -n "$last_project" && "$colored_data" == *"$last_project"* ]]; then
+    local selected_line rest_lines
+    selected_line=$(printf '%s' "$colored_data" | grep -F "$last_project" | head -1) || true
+    rest_lines=$(printf '%s' "$colored_data" | grep -vF "$last_project") || true
+    if [[ -n "$selected_line" ]]; then
+      colored_data="${selected_line}"$'\n'
+      [[ -n "$rest_lines" ]] && colored_data+="${rest_lines}"$'\n'
+    fi
+  fi
+
   local fzf_output
   fzf_output=$(printf '%s' "$colored_data" \
     | fzf \
@@ -218,6 +229,7 @@ _view_projects() {
 
 _view_sessions_for_project() {
   local project_name="$1"
+  local last_session_id="${2:-}"
   local data_py="$SCRIPT_DIR/lib/data.py"
 
   local session_data
@@ -276,6 +288,16 @@ _view_sessions_for_project() {
       "$sid" "$title" "$project_name" "$directory" "$msgs" "$agents" "$time_str" "$slug" "$is_sub" "$sess_status" \
       "$display")"$'\n'
   done <<< "$filtered_data"
+
+  if [[ -n "$last_session_id" && "$colored_data" == *"$last_session_id"* ]]; then
+    local selected_line rest_lines
+    selected_line=$(printf '%s' "$colored_data" | grep -F "$last_session_id" | head -1) || true
+    rest_lines=$(printf '%s' "$colored_data" | grep -vF "$last_session_id") || true
+    if [[ -n "$selected_line" ]]; then
+      colored_data="${selected_line}"$'\n'
+      [[ -n "$rest_lines" ]] && colored_data+="${rest_lines}"$'\n'
+    fi
+  fi
 
   local fzf_output
   fzf_output=$(printf '%s' "$colored_data" \

@@ -63,10 +63,10 @@ dash_main() {
   while true; do
     case "$CURRENT_VIEW" in
       sessions)
-        result=$(view_sessions)
+        result=$(view_sessions "" "$CURRENT_SESSION_PROJECT")
         ;;
       sessions_project)
-        result=$(view_sessions "$CURRENT_SESSION_PROJECT")
+        result=$(view_sessions "$CURRENT_SESSION_PROJECT" "$CURRENT_SESSION_ID")
         ;;
       detail)
         result=$(view_detail "$CURRENT_SESSION_ID" "$CURRENT_SESSION_TITLE")
@@ -90,7 +90,6 @@ dash_main() {
         ;;
       view:sessions)
         CURRENT_VIEW="sessions"
-        CURRENT_SESSION_PROJECT=""
         ;;
       view:sessions:*)
         CURRENT_SESSION_PROJECT="${result#view:sessions:}"
