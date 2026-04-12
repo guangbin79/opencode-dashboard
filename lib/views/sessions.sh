@@ -121,11 +121,11 @@ view_sessions() {
 
   local CYAN=$'\033[38;2;136;192;208m'
   local BRIGHT=$'\033[38;2;236;239;244m'
-  local TEAL=$'\033[38;2;143;188;187m'
   local DIM=$'\033[38;2;76;86;106m'
   local RESET=$'\033[0m'
 
-  # TSV: 1=session_id 2=title 3=project_name 4=directory 5=msg_count 6=agents 7=updated_relative 8=slug
+  # TSV: 1=session_id 2=title 3=project_name 4=directory 5=msg_count 6=agents 7=updated_relative 8=slug 9=is_subagent
+  # awk appends fields 10-13 as formatted display columns
 
   local fzf_colors
   if [[ -n "${FZF_NORD_COLORS:-}" ]]; then
@@ -139,33 +139,39 @@ view_sessions() {
   escaped_data_py=$(printf '%s' "$data_py" | sed "s/'/'\\\\''/g")
   preview_cmd="$SCRIPT_DIR/lib/views/sessions.sh _preview {1} '$escaped_data_py'"
 
+  local header
+  header="$(n_header_bar "Sessions")"$'\n'"$(n_column_header "  Title                            Project               Msgs  Time")"
+
   local fzf_output
   fzf_output=$(printf '%s\n' "$session_data" \
-    | awk -F'\t' -v cyan="$CYAN" -v bright="$BRIGHT" -v teal="$TEAL" -v dim="$DIM" -v reset="$RESET" '
+    | awk -F'\t' -v cyan="$CYAN" -v bright="$BRIGHT" -v dim="$DIM" -v reset="$RESET" '
       BEGIN { OFS="\t" }
       {
         title = $2
-        if (length(title) > 40) title = substr(title, 1, 37) "..."
-        agents = $6
-        if (length(agents) > 30) agents = substr(agents, 1, 27) "..."
-        $2 = cyan title reset
-        $5 = bright $5 reset
-        $6 = teal agents reset
-        $7 = dim $7 reset
-        print
+        if (length(title) > 38) title = substr(title, 1, 35) "..."
+        project = $3
+        if (length(project) > 20) project = substr(project, 1, 17) "..."
+        msgs = $5
+        time = $7
+        sub_flag = $9
+
+        icon = (sub_flag == "1") ? dim " *" reset : "  "
+
+        display = icon " " cyan title reset "\t" dim project reset "\t" bright msgs reset "\t" dim time reset
+
+        print $0 "\t" display
       }
     ' \
     | fzf \
       --ansi \
       --color="$fzf_colors" \
       --delimiter='\t' \
-      --with-nth='2,5,6,7' \
+      --with-nth=10,11,12,13 \
       --expect=Enter,1,3,4,q \
       --preview="$preview_cmd" \
       --preview-window='right:60%:wrap' \
-      --bind='j:down' \
-      --bind='k:up' \
-      --header='[Enter] detail  [1-4] views  [q] quit  [/] search' \
+      --bind='j:down,k:up' \
+      --header="$header" \
       --no-multi \
       --reverse \
       --prompt='sessions> ' \

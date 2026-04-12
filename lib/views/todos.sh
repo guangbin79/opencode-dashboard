@@ -19,66 +19,75 @@ view_todos() {
     return 0
   fi
 
-  local colored_data
-  colored_data=$(while IFS=$'\t' read -r sid status priority content session_title position created_rel; do
-    local status_icon
+  # --- Build header ---
+  local header
+  header="$(n_header_bar "Todos")"$'\n'"$(n_help_bar todos)"
+
+  # --- Count todos per status ---
+  local ip_count=0 p_count=0 c_count=0 x_count=0
+  while IFS=$'\t' read -r _sid _status _rest; do
+    [[ -z "$_sid" ]] && continue
+    case "$_status" in
+      in_progress) ((ip_count++)) ;;
+      pending)     ((p_count++)) ;;
+      completed)   ((c_count++)) ;;
+      cancelled)   ((x_count++)) ;;
+    esac
+  done <<< "$data"
+
+  # --- Process with grouping and fixed-width columns ---
+  local colored_data=""
+  local last_status=""
+
+  while IFS=$'\t' read -r sid status priority content session_title position created_rel; do
+    [[ -z "$sid" ]] && continue
+
+    if [[ "$status" != "$last_status" ]]; then
+      case "$status" in
+        in_progress) colored_data+="${N_DIM}-- In Progress (${ip_count}) --${N_RESET}"$'\n' ;;
+        pending)     colored_data+="${N_DIM}-- Pending (${p_count}) --${N_RESET}"$'\n' ;;
+        completed)   colored_data+="${N_DIM}-- Completed (${c_count}) --${N_RESET}"$'\n' ;;
+        cancelled)   colored_data+="${N_DIM}-- Cancelled (${x_count}) --${N_RESET}"$'\n' ;;
+      esac
+      last_status="$status"
+    fi
+
+    local sicon
     case "$status" in
-      completed)  status_icon="${N_GREEN}[v]${N_RESET}" ;;
-      in_progress) status_icon="${N_YELLOW}[*]${N_RESET}" ;;
-      pending)    status_icon="${N_DIM}[o]${N_RESET}" ;;
-      cancelled)  status_icon="${N_RED}[x]${N_RESET}" ;;
-      *)          status_icon="${N_DIM}[?]${N_RESET}" ;;
+      in_progress) sicon="${N_YELLOW}[~]${N_RESET}" ;;
+      pending)     sicon="${N_DIM}[ ]${N_RESET}" ;;
+      completed)   sicon="${N_GREEN}[x]${N_RESET}" ;;
+      cancelled)   sicon="${N_RED}[!]${N_RESET}" ;;
+      *)           sicon="${N_DIM}[?]${N_RESET}" ;;
     esac
 
-    local prio_icon
+    local picon
     case "$priority" in
-      high)   prio_icon="${N_RED}!!!${N_RESET}" ;;
-      medium) prio_icon="${N_YELLOW}!!${N_RESET}" ;;
-      low)    prio_icon="${N_DIM}!${N_RESET}" ;;
-      *)      prio_icon="${N_DIM}?${N_RESET}" ;;
+      high)   picon="${N_RED}!!!${N_RESET}" ;;
+      medium) picon="${N_YELLOW}!! ${N_RESET}" ;;
+      low)    picon="${N_DIM}!  ${N_RESET}" ;;
+      *)      picon="${N_DIM}?  ${N_RESET}" ;;
     esac
 
-    local content_display
-    content_display="$(n_truncate "$content" 50)"
+    local c_trunc
+    c_trunc="$(n_truncate "$content" 45)"
+    local t_trunc
+    t_trunc="$(n_truncate "$session_title" 15)"
 
-    local session_display
-    session_display="${N_BLUE}$(n_truncate "$session_title" 25)${N_RESET}"
-
-    local time_display
-    time_display="${N_DIM}${created_rel}${N_RESET}"
-
-    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+    # TSV: raw fields 1-7, display fields 8-12
+    colored_data+="$(printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s' \
       "$sid" "$status" "$priority" "$content" "$session_title" "$position" "$created_rel" \
-      "$status_icon" "$prio_icon" "${N_FG}${content_display}${N_RESET}" "$session_display" "$time_display"
-  done <<< "$data")
+      "$sicon" "$picon" "${N_FG}${c_trunc}${N_RESET}" \
+      "${N_BLUE}${t_trunc}${N_RESET}" "${N_DIM}${created_rel}${N_RESET}")"$'\n'
+  done <<< "$data"
 
+  # --- Preview command ---
   local preview_cmd
-  preview_cmd="python3 '$_VIEW_TODOS_SCRIPT_DIR/lib/data.py' session-meta {1} 2>/dev/null | python3 -c \"
-import sys, json
-try:
-    d = json.load(sys.stdin)
-    if 'error' in d:
-        print(d['error'])
-    else:
-        print(f'\\033[1mSession\\033[0m: {d.get(\\\"title\\\", \\\"\\\")}')
-        print(f'\\033[38;2;129;161;193mProject\\033[0m: {d.get(\\\"project\\\", \\\"\\\")}')
-        print(f'Messages: {d.get(\\\"message_count\\\", 0)}')
-        agents = d.get(\\\"agents\\\", [])
-        if agents:
-            print(f'Agents: {\\\", \\\".join(agents)}')
-        created = d.get(\\\"created\\\", \\\"\\\")
-        updated = d.get(\\\"updated\\\", \\\"\\\")
-        if created: print(f'Created: {created}')
-        if updated: print(f'Updated: {updated}')
-        tokens_in = d.get(\\\"tokens\\\", {}).get(\\\"input\\\", 0)
-        tokens_out = d.get(\\\"tokens\\\", {}).get(\\\"output\\\", 0)
-        if tokens_in or tokens_out:
-            print(f'Tokens: {tokens_in} in / {tokens_out} out')
-except: pass
-\""
+  preview_cmd="'$_VIEW_TODOS_SCRIPT_DIR/lib/views/todos.sh' _preview {1} '$_VIEW_TODOS_SCRIPT_DIR/lib/data.py'"
 
+  # --- FZF selection ---
   local result
-  result=$(printf '%s\n' "$colored_data" \
+  result=$(printf '%s' "$colored_data" \
     | fzf \
       --ansi \
       --color="$FZF_NORD_COLORS" \
@@ -88,7 +97,7 @@ except: pass
       --preview="$preview_cmd" \
       --preview-window='right:55%:wrap' \
       --bind='j:down,k:up' \
-      --header='[Enter] go to session  [1-4] views  [q] quit' \
+      --header="$header" \
       --no-multi \
       --reverse \
       --prompt='todos> ' \
@@ -116,3 +125,74 @@ except: pass
     *) echo "quit" ;;
   esac
 }
+
+# _todos_format_preview: formats session metadata for preview pane
+# Args: $1=session_id, $2=path to data.py
+_todos_format_preview() {
+  local session_id="$1"
+  local data_py="$2"
+
+  # Source render.sh for Nord colors when running as preview subprocess
+  # shellcheck source=/dev/null
+  [[ -z "${N_CYAN:-}" ]] && source "$_VIEW_TODOS_DIR/../render.sh"
+
+  local json
+  json=$(python3 "$data_py" session-meta "$session_id" 2>/dev/null)
+  if [[ -z "$json" ]]; then
+    printf '%sNo data available%s\n' "$N_DIM" "$N_RESET"
+    return
+  fi
+
+  local err
+  err=$(printf '%s' "$json" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('error',''))" 2>/dev/null)
+  if [[ -n "$err" ]]; then
+    printf '%sError: %s%s\n' "$N_RED" "$err" "$N_RESET"
+    return
+  fi
+
+  local title project messages created updated agents_str
+  title=$(printf '%s' "$json" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('title',''))" 2>/dev/null)
+  project=$(printf '%s' "$json" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('project',''))" 2>/dev/null)
+  messages=$(printf '%s' "$json" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('messages',0))" 2>/dev/null)
+  created=$(printf '%s' "$json" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('created',''))" 2>/dev/null)
+  updated=$(printf '%s' "$json" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('updated',''))" 2>/dev/null)
+  agents_str=$(printf '%s' "$json" | python3 -c "import sys,json; d=json.load(sys.stdin); print(', '.join(d.get('agents',[])))" 2>/dev/null)
+
+  local tokens_in tokens_out
+  tokens_in=$(printf '%s' "$json" | python3 -c "import sys,json; d=json.load(sys.stdin); t=d.get('tokens_total',{}); print(t.get('input',0))" 2>/dev/null)
+  tokens_out=$(printf '%s' "$json" | python3 -c "import sys,json; d=json.load(sys.stdin); t=d.get('tokens_total',{}); print(t.get('output',0))" 2>/dev/null)
+
+  local S=$'\033[38;2;67;76;94m'
+  printf '\n'
+  printf '  %s%s%s%s\n' "$N_BOLD" "$N_CYAN" "$title" "$N_RESET"
+  printf '  %s----------------------------------------%s\n' "$S" "$N_RESET"
+
+  [[ -n "$project" ]] && printf '  %sproject%s   %s\n' "$N_DIM" "$N_RESET" "$project"
+  printf '  %smessages%s  %s%s%s\n' "$N_DIM" "$N_RESET" "$N_YELLOW" "$messages" "$N_RESET"
+  [[ -n "$agents_str" ]] && printf '  %sagents%s    %s%s%s\n' "$N_DIM" "$N_RESET" "$N_TEAL" "$agents_str" "$N_RESET"
+
+  printf '  %s----------------------------------------%s\n' "$S" "$N_RESET"
+  [[ -n "$created" ]] && printf '  %screated%s   %s\n' "$N_DIM" "$N_RESET" "$created"
+  [[ -n "$updated" ]] && printf '  %supdated%s   %s\n' "$N_DIM" "$N_RESET" "$updated"
+
+  if [[ -n "$tokens_in" && "$tokens_in" != "0" ]]; then
+    printf '  %stokens%s    in: %s  out: %s\n' "$N_DIM" "$N_RESET" "$tokens_in" "$tokens_out"
+  fi
+  printf '\n'
+}
+
+# _todos_preview_entry: dispatches preview from fzf --preview
+_todos_preview_entry() {
+  local action="$1"
+  local session_id="$2"
+  local data_py="$3"
+
+  if [[ "$action" == "_preview" ]]; then
+    _todos_format_preview "$session_id" "$data_py"
+  fi
+}
+
+# If called with _preview as first arg, run the preview function
+if [[ "${1:-}" == "_preview" ]]; then
+  _todos_preview_entry "$1" "${2:-}" "${3:-}"
+fi

@@ -17,12 +17,15 @@ _agent_color_name() {
   esac
 }
 
-# TSV: agent(1) msgs(2) in_tok(3) out_tok(4) avg(5) sessions(6)
+# TSV input: agent(1) msgs(2) in_tok(3) out_tok(4) avg(5) sessions(6)
 _agent_format_line() {
   local IFS=$'\t'
   read -r c1 c2 c3 c4 _c5 c6 <<< "$1"
-  printf '%s\t%s%s%s\t%s%s%s\t%s%s%s\t%s%s%s\n' \
+  local colored_name
+  colored_name="$(_agent_color_name "$c1")"
+  printf '%s\t%s\t%s%s%s\t%s%s%s\t%s%s%s\t%s%s%s\n' \
     "${c1}" \
+    "${colored_name}" \
     "${N_BRIGHT}" "$(printf '%6s' "${c2}")" "${N_RESET}" \
     "${N_BLUE}"   "$(printf '%8s' "${c3}")" "${N_RESET}" \
     "${N_TEAL}"   "$(printf '%8s' "${c4}")" "${N_RESET}" \
@@ -38,14 +41,16 @@ view_agents() {
     return 0
   fi
 
+  local header_line separator_line
+  header_line=$'\t'"$(n_column_header "Agent")"$'\t'"$(n_column_header "  Msgs")"$'\t'"$(n_column_header "   Input")"$'\t'"$(n_column_header "  Output")"$'\t'"$(n_column_header "Sess")"
+  separator_line=$'\t'"${N_DIM}──────────────────${N_RESET}"$'\t'"${N_DIM}──────${N_RESET}"$'\t'"${N_DIM}────────${N_RESET}"$'\t'"${N_DIM}────────${N_RESET}"$'\t'"${N_DIM}────${N_RESET}"
+
   local formatted=""
+  formatted="${header_line}"$'\n'"${separator_line}"$'\n'
   while IFS= read -r line; do
     [[ -z "$line" ]] && continue
     formatted="${formatted}$(_agent_format_line "$line")"$'\n'
   done <<< "$data"
-
-  local header
-  header="$(n_header_bar "Agents" "Sessions" "Sessions" "Detail" "Agents" "Todos")"
 
   local result key
   result=$(printf '%s' "$formatted" \
@@ -58,7 +63,7 @@ view_agents() {
       --preview="python3 '${SCRIPT_DIR}/lib/views/_agent_preview.py' {1} '${SCRIPT_DIR}/lib/data.py'" \
       --preview-window='right:60%:wrap' \
       --bind='j:down,k:up' \
-      --header="${header}"$'\n'"[1-4] views  [q] quit  [/] search" \
+      --header="$(n_header_bar "Agents")"$'\n'"$(n_help_bar agents)" \
       --no-multi \
       --reverse \
       --prompt='agents> ' \

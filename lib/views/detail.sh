@@ -232,11 +232,11 @@ view_detail() {
   # Color constants for awk injection
   local YELLOW='\033[38;2;235;203;139m'
   local CYAN='\033[38;2;136;192;208m'
-  local TEAL='\033[38;2;143;188;187m'
   local DIM='\033[38;2;76;86;106m'
-  local SECONDARY='\033[38;2;129;161;193m'
-  local FG='\033[38;2;216;222;233m'
   local RESET='\033[0m'
+
+  local header
+  header="$(n_header_bar "Detail")"$'\n'"  ${session_title:-$session_id}"$'\n'"$(n_column_header "  Role  Agent               Time         Tokens  Summary")"
 
   # fzf color string
   local fzf_colors
@@ -252,59 +252,59 @@ view_detail() {
   local preview_cmd
   preview_cmd="$SCRIPT_DIR/lib/views/detail.sh _preview {1} '$escaped_data_py'"
 
-
-  # Run fzf with colored input
-  # Data TSV columns: 1=message_id, 2=role, 3=agent, 4=time, 5=tokens_in,
-  #                   6=tokens_out, 7=model, 8=preview
-  # Display with --with-nth: role(2), agent(3), time(4), tokens_in(5), preview(8)
+  # Data TSV: 1=message_id, 2=role, 3=agent, 4=time, 5=tokens_in,
+  #           6=tokens_out, 7=model, 8=preview
   local fzf_output exit_code
   fzf_output=$(printf '%s\n' "$message_data" \
-    | awk -F'\t' -v yellow="$YELLOW" -v cyan="$CYAN" -v teal="$TEAL" \
-        -v dim="$DIM" -v secondary="$SECONDARY" -v fg="$FG" -v reset="$RESET" '
+    | awk -F'\t' -v yellow="$YELLOW" -v cyan="$CYAN" -v dim="$DIM" -v reset="$RESET" '
       BEGIN { OFS="\t" }
       {
         role = $2
         agent = $3
-        time_val = $4
-        tokens_in = $5
+        time = $4
+        tok_in = $5
         preview = $8
 
         # Role icon
-        icon = "?"
-        icon_color = dim
-        if (role == "user") { icon = ">"; icon_color = yellow }
-        else if (role == "assistant") { icon = "<"; icon_color = cyan }
-        else if (role == "tool") { icon = "#"; icon_color = dim }
-        $2 = icon_color icon reset
+        if (role == "user") {
+          icon = yellow ">" reset
+        } else if (role == "assistant") {
+          icon = cyan "<" reset
+        } else {
+          icon = dim "#" reset
+        }
 
-        # Agent - truncate 25 chars
-        if (length(agent) > 25) agent = substr(agent, 1, 22) "..."
-        $3 = teal agent reset
+        # Shorten agent name: remove parenthetical
+        gsub(/ [(].*/, "", agent)
+        if (length(agent) > 20) agent = substr(agent, 1, 17) "..."
 
-        # Time - dimmed
-        $4 = dim time_val reset
+        # Format tokens
+        if (tok_in+0 >= 1000) {
+          tokens = sprintf("%.1fk", tok_in/1000)
+        } else if (role == "user") {
+          tokens = "-"
+        } else {
+          tokens = tok_in
+        }
 
-        # Tokens in - secondary color
-        $5 = secondary tokens_in reset
-
-        # Preview - truncate 50 chars, foreground
+        # Truncate preview
         if (length(preview) > 50) preview = substr(preview, 1, 47) "..."
-        $8 = fg preview reset
 
-        print
+        display = " " icon " " cyan agent reset "\t" dim time reset "\t" dim tokens reset "\t" preview
+        print $0 "\t" display
       }
     ' \
     | fzf \
       --ansi \
       --color="$fzf_colors" \
       --delimiter='\t' \
-      --with-nth='2,3,4,5,8' \
+      --with-nth='9,10,11,12' \
       --expect=Enter,b,Backspace,1,3,4,q \
       --preview="$preview_cmd" \
       --preview-window='right:65%:wrap' \
       --bind='j:down' \
       --bind='k:up' \
-      --header="${session_title:-$session_id}  |  [Enter] expand  [b] back  [1-4] views  [q] quit" \
+      --header="$header" \
       --no-multi \
       --reverse \
       --prompt='detail> ' \
