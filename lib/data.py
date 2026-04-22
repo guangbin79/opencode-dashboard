@@ -892,6 +892,57 @@ def cmd_project_stats(args):
     conn.close()
 
 
+def cmd_message_count(args):
+    """Get message count for a session."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT COUNT(*) FROM message WHERE session_id = ?",
+        (args.session_id,),
+    )
+    count = cursor.fetchone()[0]
+    print(count)
+    conn.close()
+
+
+def cmd_agent_status(args):
+    """Get agent status for a session."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT json_extract(data, '$.role') AS role,
+               json_extract(data, '$.agent') AS agent,
+               time_updated
+        FROM message
+        WHERE session_id = ?
+        ORDER BY time_updated DESC
+        LIMIT 1
+        """,
+        (args.session_id,),
+    )
+    row = cursor.fetchone()
+    if not row:
+        print(json.dumps({"status": "idle", "agent": "", "role": ""}))
+        conn.close()
+        return
+    now_ms = int(time.time() * 1000)
+    age_ms = now_ms - (row["time_updated"] or 0)
+    status = "idle"
+    if row["role"] == "assistant" and age_ms < 10 * 60 * 1000:
+        status = "running"
+    elif row["role"] == "user" and age_ms < 24 * 3600 * 1000:
+        status = "waiting"
+    result = {
+        "status": status,
+        "agent": row["agent"] or "",
+        "role": row["role"] or "",
+        "last_updated": row["time_updated"],
+    }
+    print(json.dumps(result))
+    conn.close()
+
+
 def build_parser():
     """Build the argument parser with subcommands."""
     parser = argparse.ArgumentParser(
@@ -957,6 +1008,12 @@ def build_parser():
         "project-stats", help="Project list with session counts"
     )
 
+    p_count = subparsers.add_parser("message-count", help="Message count for session")
+    p_count.add_argument("session_id", type=str, help="Session ID")
+
+    p_status = subparsers.add_parser("agent-status", help="Agent status for session")
+    p_status.add_argument("session_id", type=str, help="Session ID")
+
     return parser
 
 
@@ -979,6 +1036,8 @@ def main():
         "todos": cmd_todos,
         "todo-stats": cmd_todo_stats,
         "project-stats": cmd_project_stats,
+        "message-count": cmd_message_count,
+        "agent-status": cmd_agent_status,
     }
 
     handler = command_map.get(args.command)
