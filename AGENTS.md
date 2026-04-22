@@ -24,6 +24,33 @@
 
 ### 项目结构
 
+```
+.
+├── dashboard.sh          # 主入口脚本（tmux 检测、主循环、视图路由）
+├── lib/
+│   ├── data.py           # Python 数据层（SQLite 查询，11 个命令）
+│   ├── render.sh         # Nord 主题配色与格式化工具
+│   ├── tmux.sh           # tmux 环境管理（session、分屏、popup）
+│   └── views/
+│       ├── projects.sh   # L1: 项目列表视图（fzf）
+│       ├── sessions.sh   # L2: Session 列表视图（fzf）
+│       ├── agent.sh      # L3: Agent 交互视图（tmux 分屏）
+│       ├── detail.sh     # 消息详情视图
+│       ├── agents.sh     # Agent 统计视图
+│       └── todos.sh      # Todo 列表视图
+├── docs/
+│   └── agents/           # Agent 开发文档
+│       ├── core/         # 核心原则与开发指南
+│       └── knowledge/    # 知识库（模块经验、决策记录）
+└── tasks.md              # 任务计划清单
+```
+
+**关键文件说明：**
+- `dashboard.sh` - 3级导航主循环（Projects → Sessions → Agent）
+- `lib/data.py` - 数据访问层，提供 11 个 CLI 命令（sessions, messages, agent-status 等）
+- `lib/tmux.sh` - tmux 集成，支持自动启动、分屏管理、Nord 主题
+- `lib/views/*.sh` - 6 个 fzf/tmux 视图，遵循返回字符串协议（quit/back/view:*）
+
 ### Worktree 规则
 - 目录: `.worktrees/<分支名>`
 - 分支命名: `feature/<功能名>` | `fix/<问题名>`
