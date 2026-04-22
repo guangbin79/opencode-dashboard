@@ -110,9 +110,11 @@ _sessions_format_preview() {
 # view_sessions
 # Shows fzf session list. Returns:
 #   "quit" - user pressed q
-#   "view:detail:<session_id>" - user selected a session to view detail
-#   "view:agents" - user pressed 3 to switch to agents view
-#   "view:todos" - user pressed 4 to switch to todos view
+#   "view:agent:<session_id>" - user selected a session to view agent
+#   "view:projects" - user pressed 1/b/h/Backspace to go back to L1
+#   "view:sessions" - user pressed 2 to refresh
+#   "view:agents" - user pressed 4 to switch to agents view
+#   "view:todos" - user pressed 5 to switch to todos view
 view_sessions() {
   local SCRIPT_DIR
   SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -126,110 +128,7 @@ view_sessions() {
     return $?
   fi
 
-  _view_projects "${2:-}"
-}
-
-_view_projects() {
-  local last_project="${1:-}"
-  local data_py="$SCRIPT_DIR/lib/data.py"
-
-  local project_data
-  project_data=$(python3 "$data_py" project-stats 2>/dev/null)
-  if [[ $? -ne 0 || -z "$project_data" ]]; then
-    echo "quit"
-    return 0
-  fi
-
-  local fzf_colors
-  if [[ -n "${FZF_NORD_COLORS:-}" ]]; then
-    fzf_colors="$FZF_NORD_COLORS"
-  else
-    fzf_colors='fg:#D8DEE9,bg:#2E3440,hl:#88C0D0,fg+:#ECEFF4,bg+:#3B4252,hl+:#88C0D0,border:#434C5E,header:#5E81AC,gutter:#434C5E,spinner:#88C0D0,info:#81A1C1,pointer:#88C0D0,marker:#A3BE8C,prompt:#5E81AC,selected-bg:#434C5E'
-  fi
-
-  local header
-  header="$(n_header_bar "Sessions")"$'\n'"$(n_column_header "  Project                        Sessions  Status          Updated")"
-
-  local colored_data=""
-  while IFS=$'\t' read -r pname count running waiting updated latest; do
-    [[ -z "$pname" ]] && continue
-
-    local status_str
-    if [[ "$running" -gt 0 ]] 2>/dev/null; then
-      status_str="${N_GREEN}● ${running} running${N_RESET}"
-    elif [[ "$waiting" -gt 0 ]] 2>/dev/null; then
-      status_str="${N_YELLOW}● ${waiting} waiting${N_RESET}"
-    else
-      status_str="${N_DIM}○ idle${N_RESET}"
-    fi
-
-    local p_padded
-    p_padded="${N_CYAN}$(printf '%-28s' "$(n_truncate "$pname" 28)")${N_RESET}"
-    local c_padded
-    c_padded="${N_BRIGHT}$(printf '%5s' "$count")${N_RESET}"
-    local u_padded
-    u_padded="${N_DIM}$(printf '%-14s' "$updated")${N_RESET}"
-
-    local display
-    display=" ${p_padded} ${c_padded}  ${status_str}  ${u_padded}"
-
-    colored_data+="$(printf '%s\t%s' "$pname" "$display")"$'\n'
-  done <<< "$project_data"
-
-  if [[ -n "$last_project" && -n "$colored_data" ]]; then
-    local selected_line all_lines before_lines after_lines
-    selected_line=$(printf '%s' "$colored_data" | grep -F "$last_project" | head -1) || true
-    if [[ -n "$selected_line" ]]; then
-      all_lines=$(printf '%s' "$colored_data" | grep -n -F "$last_project" | head -1 | cut -d: -f1) || true
-      if [[ -n "$all_lines" ]]; then
-        before_lines=$(printf '%s' "$colored_data" | head -n $((all_lines - 1))) || true
-        after_lines=$(printf '%s' "$colored_data" | tail -n +"$((all_lines + 1))") || true
-        colored_data="${selected_line}"$'\n'
-        [[ -n "$after_lines" ]] && colored_data+="${after_lines}"$'\n'
-        [[ -n "$before_lines" ]] && colored_data+="${before_lines}"$'\n'
-      fi
-    fi
-  fi
-
-  local fzf_output
-  fzf_output=$(printf '%s' "$colored_data" \
-    | fzf \
-      --ansi \
-      --color="$fzf_colors" \
-      --delimiter='\t' \
-      --with-nth=2 \
-      --expect=Enter,l,1,2,3,4,q \
-      --preview="echo '${N_DIM}Press Enter/l to browse sessions in this project${N_RESET}'" \
-      --preview-window='right:50%:wrap' \
-      --bind='j:down,k:up' \
-      --header="$header" \
-      --no-multi \
-      --reverse \
-      --prompt='projects> ' \
-      --height=100% \
-    2>/dev/null) || true
-
-  local key
-  key=$(printf '%s' "$fzf_output" | head -1)
-  local selection
-  selection=$(printf '%s' "$fzf_output" | tail -n +2)
-
-  case "$key" in
-    Enter|l)
-      if [[ -n "$selection" ]]; then
-        local selected_project
-        selected_project=$(printf '%s' "$selection" | head -1 | cut -f1)
-        echo "view:sessions:${selected_project}"
-      else
-        echo "quit"
-      fi
-      ;;
-    1) echo "view:sessions" ;;
-    2) echo "view:sessions" ;;
-    3) echo "view:agents" ;;
-    4) echo "view:todos" ;;
-    *) echo "quit" ;;
-  esac
+  echo "view:projects"
 }
 
 _view_sessions_for_project() {
@@ -316,7 +215,7 @@ _view_sessions_for_project() {
       --color="$fzf_colors" \
       --delimiter='\t' \
       --with-nth=11 \
-      --expect=Enter,l,b,Backspace,h,1,2,3,4,q \
+      --expect=Enter,l,b,Backspace,h,1,2,3,4,5,q \
       --preview="$preview_cmd" \
       --preview-window='right:60%:wrap' \
       --bind='j:down,k:up' \
@@ -333,19 +232,20 @@ _view_sessions_for_project() {
   selection=$(printf '%s' "$fzf_output" | tail -n +2)
 
   case "$key" in
-    Enter|l|2)
+    Enter|l|3)
       if [[ -n "$selection" ]]; then
         local selected_id
         selected_id=$(printf '%s' "$selection" | head -1 | cut -f1)
-        echo "view:detail:${selected_id}"
+        echo "view:agent:${selected_id}"
       else
-        echo "view:sessions"
+        echo "view:projects"
       fi
       ;;
-    b|Backspace|h) echo "view:sessions" ;;
-    1) echo "view:sessions" ;;
-    3) echo "view:agents" ;;
-    4) echo "view:todos" ;;
+    b|Backspace|h) echo "view:projects" ;;
+    1) echo "view:projects" ;;
+    2) echo "view:sessions" ;;
+    4) echo "view:agents" ;;
+    5) echo "view:todos" ;;
     *) echo "quit" ;;
   esac
 }
