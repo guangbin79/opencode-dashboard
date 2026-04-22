@@ -39,7 +39,7 @@ tmux_is_running() {
 }
 
 tmux_get_width() {
-  if [ -n "$COLUMNS" ] && [ "$COLUMNS" -gt 0 ] 2>/dev/null; then
+  if [ -n "${COLUMNS:-}" ] && [ "${COLUMNS:-}" -gt 0 ] 2>/dev/null; then
     echo "$COLUMNS"
   elif tmux_is_running; then
     tmux display-message -p '#{pane_width}'
@@ -49,7 +49,7 @@ tmux_get_width() {
 }
 
 tmux_get_height() {
-  if [ -n "$LINES" ] && [ "$LINES" -gt 0 ] 2>/dev/null; then
+  if [ -n "${LINES:-}" ] && [ "${LINES:-}" -gt 0 ] 2>/dev/null; then
     echo "$LINES"
   elif tmux_is_running; then
     tmux display-message -p '#{pane_height}'
@@ -115,7 +115,7 @@ tmux_agent_split() {
 
 tmux_agent_close() {
   if [[ -n "$AGENT_PANE_BOTTOM" ]] && tmux_is_running; then
-    tmux kill-pane -t "$AGENT_PANE_BOTTOM" 2>/dev/null
+    tmux kill-pane -t "$AGENT_PANE_BOTTOM" 2>/dev/null || true
     AGENT_PANE_BOTTOM=""
   fi
   AGENT_PANE_TOP=""

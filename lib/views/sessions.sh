@@ -144,9 +144,9 @@ _view_sessions_for_project() {
   fi
 
   local filtered_data
-  filtered_data=$(printf '%s\n' "$session_data" | awk -F'\t' '$9 == "0" && $3 == "'"${project_name}""'")
+  filtered_data=$(printf '%s\n' "$session_data" | awk -F'\t' -v proj="$project_name" '$9 == "0" && $3 == proj')
   if [[ -z "$filtered_data" ]]; then
-    filtered_data=$(printf '%s\n' "$session_data" | awk -F'\t' '$9 == "0" && $3 ~ /'"${project_name}"'/')
+    filtered_data=$(printf '%s\n' "$session_data" | awk -F'\t' -v proj="$project_name" '$9 == "0" && $3 ~ proj')
   fi
   if [[ -z "$filtered_data" ]]; then
     echo "back"

@@ -77,7 +77,8 @@ dash_main() {
         ;;
       agent)
         if declare -f view_agent >/dev/null 2>&1; then
-          result=$(view_agent "$CURRENT_SESSION_ID" "$CURRENT_SESSION_TITLE")
+          view_agent "$CURRENT_SESSION_ID" "$CURRENT_SESSION_TITLE"
+          result="back"
         else
           result="back"
         fi

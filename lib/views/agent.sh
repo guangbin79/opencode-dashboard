@@ -125,7 +125,9 @@ agent_stream_pane() {
 
   while true; do
     if [[ -n "$AGENT_PANE_BOTTOM" ]]; then
-      if ! tmux display-message -t "$AGENT_PANE_BOTTOM" -p '#{pane_id}' >/dev/null 2>&1; then
+      local pane_dead
+      pane_dead=$(tmux display-message -t "$AGENT_PANE_BOTTOM" -p '#{pane_dead}' 2>/dev/null)
+      if [[ -z "$pane_dead" || "$pane_dead" == "1" ]]; then
         break
       fi
     fi
@@ -206,14 +208,12 @@ view_agent() {
   local data_py="$SCRIPT_DIR/lib/data.py"
 
   if ! tmux_is_running; then
-    echo "back"
     return 0
   fi
 
   local count
   count=$(python3 "$data_py" message-count "$session_id" 2>/dev/null)
   if [[ -z "$count" ]]; then
-    echo "back"
     return 0
   fi
 
@@ -226,5 +226,5 @@ view_agent() {
   agent_stream_pane "$session_id"
 
   tmux_agent_close
-  echo "back"
+  return 0
 }
