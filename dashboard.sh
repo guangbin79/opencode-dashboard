@@ -7,6 +7,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # --- Source libraries ---
 source "$SCRIPT_DIR/lib/render.sh"
 source "$SCRIPT_DIR/lib/tmux.sh"
+source "$SCRIPT_DIR/lib/views/projects.sh"
 source "$SCRIPT_DIR/lib/views/sessions.sh"
 source "$SCRIPT_DIR/lib/views/detail.sh"
 source "$SCRIPT_DIR/lib/views/agents.sh"
@@ -69,7 +70,7 @@ dash_main() {
   while true; do
     case "$CURRENT_VIEW" in
       projects)
-        result=$(view_sessions "" "$CURRENT_PROJECT")
+        result=$(view_projects "$CURRENT_PROJECT")
         ;;
       sessions)
         result=$(view_sessions "$CURRENT_PROJECT" "$CURRENT_SESSION_ID")

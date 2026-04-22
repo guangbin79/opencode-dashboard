@@ -20,7 +20,8 @@ tmux_init_session() {
   fi
   tmux new-session -d -s "$name" -n "opencode-dashboard" \
     -x "$(tput cols 2>/dev/null || echo 80)" \
-    -y "$(tput lines 2>/dev/null || echo 24)"
+    -y "$(tput lines 2>/dev/null || echo 24)" \
+    "bash" "$DASH_SCRIPT_DIR/dashboard.sh"
 
   tmux set-option -t "$name" window-style "bg=#2E3440"
   tmux set-option -t "$name" pane-border-style "fg=#4C566A"

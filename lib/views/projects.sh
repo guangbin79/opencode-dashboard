@@ -81,7 +81,7 @@ view_projects() {
       --expect=Enter,l,1,2,3,4,q \
       --preview="echo '${N_DIM}Press Enter/l to browse sessions in this project${N_RESET}'" \
       --preview-window='right:50%:wrap' \
-      --bind='j:down,k:up,gg:first,G:last' \
+      --bind='j:down,k:up,Home:first,End:last,g:first,G:last' \
       --header="$header" \
       --no-multi \
       --reverse \
