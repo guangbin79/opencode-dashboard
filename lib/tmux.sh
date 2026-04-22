@@ -7,6 +7,11 @@ DASH_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # Saved state for restore
 _TMUX_SAVED_STATUS=""
 
+# Agent view pane tracking
+AGENT_PANE_TOP=""
+AGENT_PANE_BOTTOM=""
+AGENT_VIEW_ACTIVE=""
+
 tmux_init_session() {
   local name="${1:-$DASH_SESSION_NAME}"
   if tmux has-session -t "$name" 2>/dev/null; then
@@ -83,7 +88,54 @@ tmux_clear() {
   clear
 }
 
+tmux_agent_split() {
+  local session_id="$1"
+  local agent_script="$2"
+
+  if ! tmux_is_running; then
+    echo "Error: tmux is not running" >&2
+    return 1
+  fi
+
+  local original_pane="$TMUX_PANE"
+
+  AGENT_PANE_BOTTOM=$(tmux split-window -v -p 30 -P -F '#{pane_id}' \
+    -c "#{pane_current_path}" \
+    "bash -c 'source \"$agent_script\"; agent_input_pane \"$session_id\"'")
+
+  AGENT_PANE_TOP="$original_pane"
+  AGENT_VIEW_ACTIVE="1"
+
+  tmux send-keys -t "$original_pane" \
+    "bash -c 'source \"$agent_script\"; agent_stream_pane \"$session_id\"'" Enter
+
+  return 0
+}
+
+tmux_agent_close() {
+  if [[ -n "$AGENT_PANE_BOTTOM" ]] && tmux_is_running; then
+    tmux kill-pane -t "$AGENT_PANE_BOTTOM" 2>/dev/null
+    AGENT_PANE_BOTTOM=""
+  fi
+  AGENT_PANE_TOP=""
+  AGENT_VIEW_ACTIVE=""
+}
+
+tmux_agent_focus() {
+  local pane="$1"
+
+  if [[ "$pane" == "bottom" && -n "$AGENT_PANE_BOTTOM" ]]; then
+    tmux select-pane -t "$AGENT_PANE_BOTTOM"
+  elif [[ "$pane" == "top" && -n "$AGENT_PANE_TOP" ]]; then
+    tmux select-pane -t "$AGENT_PANE_TOP"
+  fi
+}
+
 tmux_restore() {
+  if [[ -n "$AGENT_VIEW_ACTIVE" ]]; then
+    tmux_agent_close
+  fi
+
   if [ -n "$_TMUX_SAVED_STATUS" ] && tmux_is_running; then
     local session="${TMUX_PANE:+$(tmux display-message -p '#{session_name}' 2>/dev/null)}"
     [ -n "$session" ] && tmux set-option -t "$session" status "$_TMUX_SAVED_STATUS" 2>/dev/null
