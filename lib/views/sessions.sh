@@ -218,7 +218,7 @@ _view_sessions_for_project() {
       --expect=Enter,l,b,Backspace,h,1,2,3,4,5,q \
       --preview="$preview_cmd" \
       --preview-window='right:60%:wrap' \
-      --bind='j:down,k:up' \
+      --bind='j:down,k:up,gg:first,G:last' \
       --header="$header" \
       --no-multi \
       --reverse \
