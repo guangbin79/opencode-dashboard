@@ -11,6 +11,7 @@ source "$SCRIPT_DIR/lib/views/sessions.sh"
 source "$SCRIPT_DIR/lib/views/detail.sh"
 source "$SCRIPT_DIR/lib/views/agents.sh"
 source "$SCRIPT_DIR/lib/views/todos.sh"
+[[ -f "$SCRIPT_DIR/lib/views/agent.sh" ]] && source "$SCRIPT_DIR/lib/views/agent.sh"
 
 # --- Common fzf base options (views append their own) ---
 FZF_BASE_OPTS=(
@@ -37,15 +38,20 @@ Options:
   --help    Show this help message
 
 Keys (inside views):
-  1-4       Switch between views
+  1-5       Switch between views
   q         Quit
-  Enter     Select / open detail
+  Enter     Select / drill down
+  b/h/Backspace  Go back one level
 
-Views:
-  [1] Sessions   Browse and search sessions
-  [2] Detail     View session messages and metadata
-  [3] Agents     Agent usage overview
-  [4] Todos      Session todo lists
+Navigation (3-level hierarchy):
+  L1 [1] Projects   Browse projects (default view)
+  L2 [2] Sessions   Project-scoped session list
+  L3     Agent      Interactive agent view (tmux split)
+
+Additional views:
+  [3] Detail     View session messages and metadata
+  [4] Agents     Agent usage overview
+  [5] Todos      Session todo lists
 EOF
 }
 
@@ -54,19 +60,26 @@ dash_main() {
   tmux_clear
   tmux_set_title "opencode-dashboard"
 
-  local CURRENT_VIEW="sessions"
+  local CURRENT_VIEW="projects"
+  local CURRENT_PROJECT=""
   local CURRENT_SESSION_ID=""
   local CURRENT_SESSION_TITLE=""
-  local CURRENT_SESSION_PROJECT=""
   local result=""
 
   while true; do
     case "$CURRENT_VIEW" in
-      sessions)
-        result=$(view_sessions "" "$CURRENT_SESSION_PROJECT")
+      projects)
+        result=$(view_sessions "" "$CURRENT_PROJECT")
         ;;
-      sessions_project)
-        result=$(view_sessions "$CURRENT_SESSION_PROJECT" "$CURRENT_SESSION_ID")
+      sessions)
+        result=$(view_sessions "$CURRENT_PROJECT" "$CURRENT_SESSION_ID")
+        ;;
+      agent)
+        if declare -f view_agent >/dev/null 2>&1; then
+          result=$(view_agent "$CURRENT_SESSION_ID" "$CURRENT_SESSION_TITLE")
+        else
+          result="back"
+        fi
         ;;
       detail)
         result=$(view_detail "$CURRENT_SESSION_ID" "$CURRENT_SESSION_TITLE")
@@ -78,7 +91,7 @@ dash_main() {
         result=$(view_todos)
         ;;
       *)
-        result="view:sessions"
+        result="view:projects"
         ;;
     esac
 
@@ -88,18 +101,25 @@ dash_main() {
         ;;
       noop)
         ;;
+      view:projects)
+        CURRENT_VIEW="projects"
+        ;;
       view:sessions)
         CURRENT_VIEW="sessions"
         ;;
       view:sessions:*)
-        CURRENT_SESSION_PROJECT="${result#view:sessions:}"
-        CURRENT_VIEW="sessions_project"
+        CURRENT_PROJECT="${result#view:sessions:}"
+        CURRENT_VIEW="sessions"
+        ;;
+      view:agent:*)
+        CURRENT_SESSION_ID="${result#view:agent:}"
+        CURRENT_VIEW="agent"
         ;;
       view:detail)
         if [[ -n "$CURRENT_SESSION_ID" ]]; then
           CURRENT_VIEW="detail"
         else
-          CURRENT_VIEW="sessions"
+          CURRENT_VIEW="projects"
         fi
         ;;
       view:detail:*)
@@ -113,12 +133,32 @@ dash_main() {
         CURRENT_VIEW="todos"
         ;;
       back)
-        if [[ "$CURRENT_VIEW" == "detail" && -n "$CURRENT_SESSION_PROJECT" ]]; then
-          CURRENT_VIEW="sessions_project"
-        else
-          CURRENT_VIEW="sessions"
-          CURRENT_SESSION_PROJECT=""
-        fi
+        case "$CURRENT_VIEW" in
+          agent)
+            CURRENT_VIEW="sessions"
+            ;;
+          detail)
+            if [[ -n "$CURRENT_PROJECT" ]]; then
+              CURRENT_VIEW="sessions"
+            else
+              CURRENT_VIEW="projects"
+            fi
+            ;;
+          sessions)
+            CURRENT_VIEW="projects"
+            CURRENT_PROJECT=""
+            ;;
+          agents|todos)
+            if [[ -n "$CURRENT_PROJECT" ]]; then
+              CURRENT_VIEW="sessions"
+            else
+              CURRENT_VIEW="projects"
+            fi
+            ;;
+          *)
+            CURRENT_VIEW="projects"
+            ;;
+        esac
         ;;
     esac
   done
