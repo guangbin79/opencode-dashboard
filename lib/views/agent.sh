@@ -12,6 +12,7 @@ AGENT_API_BASE="${AGENT_API_BASE:-http://localhost:13284}"
 
 _agent_show_header() {
   local session_id="$1"
+  local agent_name="${2:-}"
   local data_py="$SCRIPT_DIR/lib/data.py"
 
   local json status="idle" agent=""
@@ -34,7 +35,7 @@ _agent_show_header() {
   tmux_clear
   printf ' %s%s%s %s%s%s' \
     "$status_color" "$status_icon" "$N_RESET" \
-    "$N_BOLD$N_CYAN" "${agent:-agent}" "$N_RESET"
+    "$N_BOLD$N_CYAN" "${agent_name:-${agent:-agent}}" "$N_RESET"
   if [[ -n "$model" ]]; then
     printf '  %s%s%s' "$N_DIM" "$model" "$N_RESET"
   fi
@@ -45,12 +46,16 @@ _agent_show_header() {
 
 _agent_show_messages() {
   local session_id="$1"
+  local agent_name="${2:-}"
   local data_py="$SCRIPT_DIR/lib/data.py"
   local width
   width=$(tmux_get_width)
 
+  local agent_args=()
+  [[ -n "$agent_name" ]] && agent_args=("--agent" "$agent_name")
+
   local message_data
-  message_data=$(python3 "$data_py" messages "$session_id" --limit "$AGENT_MAX_MESSAGES" 2>/dev/null)
+  message_data=$(python3 "$data_py" messages "$session_id" --limit "$AGENT_MAX_MESSAGES" "${agent_args[@]}" 2>/dev/null)
   [[ -z "$message_data" ]] && return
 
   local total
@@ -116,12 +121,16 @@ _agent_abort() {
 
 agent_stream_pane() {
   local session_id="$1"
+  local agent_name="${2:-}"
   local data_py="$SCRIPT_DIR/lib/data.py"
   local last_count=0
 
-  _agent_show_header "$session_id"
-  last_count=$(python3 "$data_py" message-count "$session_id" 2>/dev/null || echo 0)
-  _agent_show_messages "$session_id"
+  local agent_args=()
+  [[ -n "$agent_name" ]] && agent_args=("--agent" "$agent_name")
+
+  _agent_show_header "$session_id" "$agent_name"
+  last_count=$(python3 "$data_py" message-count "$session_id" "${agent_args[@]}" 2>/dev/null || echo 0)
+  _agent_show_messages "$session_id" "$agent_name"
 
   while true; do
     if [[ -n "$AGENT_PANE_BOTTOM" ]]; then
@@ -133,11 +142,11 @@ agent_stream_pane() {
     fi
 
     local count
-    count=$(python3 "$data_py" message-count "$session_id" 2>/dev/null || echo "$last_count")
+    count=$(python3 "$data_py" message-count "$session_id" "${agent_args[@]}" 2>/dev/null || echo "$last_count")
 
     if [[ "$count" != "$last_count" ]]; then
-      _agent_show_header "$session_id"
-      _agent_show_messages "$session_id"
+      _agent_show_header "$session_id" "$agent_name"
+      _agent_show_messages "$session_id" "$agent_name"
       last_count="$count"
     fi
 
@@ -204,6 +213,7 @@ agent_input_pane() {
 view_agent() {
   local session_id="$1"
   local session_title="${2:-}"
+  local agent_name="${3:-}"
   local agent_script="${BASH_SOURCE[0]}"
   local data_py="$SCRIPT_DIR/lib/data.py"
 
@@ -223,7 +233,7 @@ view_agent() {
   AGENT_PANE_TOP="$TMUX_PANE"
   AGENT_VIEW_ACTIVE="1"
 
-  agent_stream_pane "$session_id"
+  agent_stream_pane "$session_id" "$agent_name"
 
   tmux_agent_close
   return 0
