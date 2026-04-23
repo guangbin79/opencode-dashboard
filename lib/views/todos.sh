@@ -5,7 +5,7 @@ _VIEW_TODOS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 _VIEW_TODOS_SCRIPT_DIR="$(cd "$_VIEW_TODOS_DIR/../.." && pwd)"
 
 # view_todos
-# Returns: "quit" | "view:sessions" | "view:detail:<session_id>" | "view:agents"
+# Returns: "quit" | "view:sessions" | "view:session-agents:<session_id>" | "view:agents"
 view_todos() {
   local data
   data=$(python3 "$_VIEW_TODOS_SCRIPT_DIR/lib/data.py" todos --status all 2>/dev/null)
@@ -115,13 +115,13 @@ view_todos() {
       if [[ -n "$selection" ]]; then
         local session_id
         session_id=$(printf '%s' "$selection" | head -1 | cut -f1)
-        echo "view:detail:${session_id}"
+        echo "view:session-agents:${session_id}"
       else
         echo "quit"
       fi
       ;;
     1) echo "view:sessions" ;;
-    2) echo "view:detail" ;;
+    2) echo "view:session-agents" ;;
     3) echo "view:agents" ;;
     *) echo "quit" ;;
   esac

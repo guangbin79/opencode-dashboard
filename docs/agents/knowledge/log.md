@@ -7,7 +7,7 @@
 - Types: Module Info, Decision
 
 ## [2026-04-12] ingest | fzf-views
-- 4个 fzf 视图（sessions/detail/agents/todos）架构与导航模式
+- 5个 fzf 视图（projects/sessions/session-agents/agents/todos）架构与导航模式
 - 修复 ANSI 转义码和 --expect 按键区分问题
 - Types: Module Info, Decision, Bug Experience, Strategy
 

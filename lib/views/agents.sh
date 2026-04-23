@@ -48,7 +48,7 @@ view_agents() {
       --color="$FZF_NORD_COLORS" \
       --delimiter='\t' \
       --with-nth=2 \
-      --expect=Enter,l,1,2,4,q \
+      --expect=Enter,l,1,2,3,4,q \
       --preview="python3 '${SCRIPT_DIR}/lib/views/_agent_preview.py' {1} '${SCRIPT_DIR}/lib/data.py'" \
       --preview-window='right:60%:wrap' \
       --bind='j:down,k:up' \
@@ -62,7 +62,8 @@ view_agents() {
   key=$(head -1 <<< "$result")
   case "$key" in
     1) echo "view:sessions" ;;
-    2) echo "view:detail" ;;
+    2) echo "view:session-agents" ;;
+    3) echo "view:agents" ;;
     4) echo "view:todos" ;;
     Enter|l) echo "view:agents" ;;
     *) echo "quit" ;;

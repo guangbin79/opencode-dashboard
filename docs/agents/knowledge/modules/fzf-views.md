@@ -3,8 +3,8 @@
 > Last updated: 2026-04-12
 
 ## Overview
-- 4个 fzf TUI 视图：sessions, detail, agents, todos
-- Key files: ./lib/views/sessions.sh, ./lib/views/detail.sh, ./lib/views/agents.sh, ./lib/views/todos.sh, ./lib/views/_agent_preview.py
+- 5个 fzf TUI 视图：projects, sessions, session-agents, agents, todos
+- Key files: ./lib/views/projects.sh, ./lib/views/sessions.sh, ./lib/views/session-agents.sh, ./lib/views/agents.sh, ./lib/views/todos.sh, ./lib/views/_agent_preview.py
 - Dependencies: fzf 0.70+, bash 5.0+, python3
 - Entry point: ./dashboard.sh
 - See also: [[data-layer]], [[render-theme]], [[tmux-integration]]
@@ -25,7 +25,7 @@
 
 ### 视图返回字符串协议 (2026-04-12)
 - **Chosen:** view 函数 echo 字符串，主循环 case 解析
-- 协议: "quit" | "back" | "view:sessions" | "view:detail:<id>" | "view:agents" | "view:todos"
+- 协议: "quit" | "back" | "view:projects" | "view:sessions" | "view:session-agents:<id>" | "view:agents" | "view:todos"
 - **Reason:** 简单文本协议，bash 原生 case 模式匹配
 - **Tradeoff:** 只支持单层导航，无法传递复杂状态
 
@@ -60,9 +60,10 @@
 ### 4个视图
 | 视图 | 函数 | 数据命令 | 特点 |
 |------|------|----------|------|
-| Sessions | view_sessions | sessions, session-meta | 默认视图，100条 |
-| Detail | view_detail(id,title) | messages, message-detail | Enter选消息, b返回 |
-| Agents | view_agents | agent-stats, agent-detail | 13个agent, 按model分表 |
+| Projects | view_projects | projects | 项目列表 |
+| Sessions | view_sessions | sessions, session-meta | L2 视图，100条 |
+| Session Agents | view_session_agents(id) | session-agents, session-meta | L3 视图，显示 session 的 agents |
+| Agents | view_agents | agent-stats, agent-detail | 全局 agent 统计 |
 | Todos | view_todos | todos, session-meta | 543条, 状态分组 |
 
 ### 按键映射

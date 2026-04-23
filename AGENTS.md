@@ -34,8 +34,8 @@
 │   └── views/
 │       ├── projects.sh   # L1: 项目列表视图（fzf）
 │       ├── sessions.sh   # L2: Session 列表视图（fzf）
-│       ├── agent.sh      # L3: Agent 交互视图（tmux 分屏）
-│       ├── detail.sh     # 消息详情视图
+│       ├── session-agents.sh # L3: Session agent list (fzf)
+│       ├── agent.sh      # L4: Agent 交互视图（tmux 分屏）
 │       ├── agents.sh     # Agent 统计视图
 │       └── todos.sh      # Todo 列表视图
 ├── docs/

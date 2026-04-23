@@ -110,11 +110,11 @@ _sessions_format_preview() {
 # view_sessions
 # Shows fzf session list. Returns:
 #   "quit" - user pressed q
-#   "view:agent:<session_id>" - user selected a session to view agent
+#   "view:session-agents:<session_id>" - user selected a session to view agents
 #   "view:projects" - user pressed 1/b/h/Backspace to go back to L1
 #   "view:sessions" - user pressed 2 to refresh
-#   "view:agents" - user pressed 4 to switch to agents view
-#   "view:todos" - user pressed 5 to switch to todos view
+#   "view:agents" - user pressed 3 to switch to agents view
+#   "view:todos" - user pressed 4 to switch to todos view
 view_sessions() {
   local SCRIPT_DIR
   SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -215,7 +215,7 @@ _view_sessions_for_project() {
       --color="$fzf_colors" \
       --delimiter='\t' \
       --with-nth=11 \
-      --expect=Enter,l,b,Backspace,h,1,2,3,4,5,q \
+      --expect=Enter,l,b,Backspace,h,1,2,3,4,q \
       --preview="$preview_cmd" \
       --preview-window='right:60%:wrap' \
       --bind='j:down,k:up,Home:first,End:last,g:first,G:last' \
@@ -232,11 +232,11 @@ _view_sessions_for_project() {
   selection=$(printf '%s' "$fzf_output" | tail -n +2)
 
   case "$key" in
-    Enter|l|3)
+    Enter|l)
       if [[ -n "$selection" ]]; then
         local selected_id
         selected_id=$(printf '%s' "$selection" | head -1 | cut -f1)
-        echo "view:agent:${selected_id}"
+        echo "view:session-agents:${selected_id}"
       else
         echo "view:projects"
       fi
@@ -244,8 +244,8 @@ _view_sessions_for_project() {
     b|Backspace|h) echo "view:projects" ;;
     1) echo "view:projects" ;;
     2) echo "view:sessions" ;;
-    4) echo "view:agents" ;;
-    5) echo "view:todos" ;;
+    3) echo "view:agents" ;;
+    4) echo "view:todos" ;;
     *) echo "quit" ;;
   esac
 }

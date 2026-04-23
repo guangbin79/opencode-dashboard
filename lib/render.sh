@@ -178,7 +178,7 @@ n_separator() {
 # Usage: n_header_bar "Sessions"
 n_header_bar() {
   local active="${1}"
-  local -a names=("Sessions" "Detail" "Agents" "Todos")
+  local -a names=("Sessions" "Session Agents" "Agents" "Todos")
   local i tabs=""
   for i in 0 1 2 3; do
     local name="${names[$i]}"
@@ -199,11 +199,11 @@ n_help_bar() {
   local view="${1}"
   local help
   case "${view}" in
-    sessions) help='[Enter/l] open  [h/b] back  [j/k] scroll  [/] search  [1-4] views  [q] quit' ;;
-    detail)   help='[h/b] back  [j/k] scroll  [1-4] views  [q] quit' ;;
-    agents)   help='[Enter/l] details  [j/k] scroll  [/] search  [1-4] views  [q] quit' ;;
-    todos)    help='[Enter/l] open  [h/b] back  [j/k] scroll  [/] search  [1-4] views  [q] quit' ;;
-    *)        help='[j/k] scroll  [/] search  [1-4] views  [q] quit' ;;
+    sessions)       help='[Enter/l] open  [h/b] back  [j/k] scroll  [/] search  [1-4] views  [q] quit' ;;
+    session-agents) help='[Enter/l] select agent  [h/b] back  [j/k] scroll  [1-4] views  [q] quit' ;;
+    agents)         help='[Enter/l] details  [j/k] scroll  [/] search  [1-4] views  [q] quit' ;;
+    todos)          help='[Enter/l] open  [h/b] back  [j/k] scroll  [/] search  [1-4] views  [q] quit' ;;
+    *)              help='[j/k] scroll  [/] search  [1-4] views  [q] quit' ;;
   esac
   printf '%s%s%s' "${N_DIM}" "${help}" "${N_RESET}"
 }
