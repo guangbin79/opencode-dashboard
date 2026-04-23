@@ -9,7 +9,7 @@ source "$SCRIPT_DIR/lib/render.sh"
 source "$SCRIPT_DIR/lib/tmux.sh"
 source "$SCRIPT_DIR/lib/views/projects.sh"
 source "$SCRIPT_DIR/lib/views/sessions.sh"
-source "$SCRIPT_DIR/lib/views/detail.sh"
+source "$SCRIPT_DIR/lib/views/session-agents.sh"
 source "$SCRIPT_DIR/lib/views/agents.sh"
 source "$SCRIPT_DIR/lib/views/todos.sh"
 [[ -f "$SCRIPT_DIR/lib/views/agent.sh" ]] && source "$SCRIPT_DIR/lib/views/agent.sh"
@@ -39,20 +39,20 @@ Options:
   --help    Show this help message
 
 Keys (inside views):
-  1-5       Switch between views
+  1-4       Switch between views
   q         Quit
   Enter     Select / drill down
   b/h/Backspace  Go back one level
 
-Navigation (3-level hierarchy):
-  L1 [1] Projects   Browse projects (default view)
-  L2 [2] Sessions   Project-scoped session list
-  L3     Agent      Interactive agent view (tmux split)
+Navigation (4-level hierarchy):
+  L1 [1] Projects        Browse projects (default view)
+  L2 [2] Sessions        Project-scoped session list
+  L3     Session Agents   Agent selector for a session
+  L4     Agent           Interactive agent view (tmux split)
 
 Additional views:
-  [3] Detail     View session messages and metadata
-  [4] Agents     Agent usage overview
-  [5] Todos      Session todo lists
+  [3] Agents     Agent usage overview
+  [4] Todos      Session todo lists
 EOF
 }
 
@@ -65,6 +65,7 @@ dash_main() {
   local CURRENT_PROJECT=""
   local CURRENT_SESSION_ID=""
   local CURRENT_SESSION_TITLE=""
+  local CURRENT_AGENT_NAME=""
   local result=""
 
   while true; do
@@ -75,16 +76,16 @@ dash_main() {
       sessions)
         result=$(view_sessions "$CURRENT_PROJECT" "$CURRENT_SESSION_ID")
         ;;
+      session-agents)
+        result=$(view_session_agents "$CURRENT_SESSION_ID" "$CURRENT_SESSION_TITLE")
+        ;;
       agent)
         if declare -f view_agent >/dev/null 2>&1; then
-          view_agent "$CURRENT_SESSION_ID" "$CURRENT_SESSION_TITLE"
+          view_agent "$CURRENT_SESSION_ID" "$CURRENT_SESSION_TITLE" "$CURRENT_AGENT_NAME"
           result="back"
         else
           result="back"
         fi
-        ;;
-      detail)
-        result=$(view_detail "$CURRENT_SESSION_ID" "$CURRENT_SESSION_TITLE")
         ;;
       agents)
         result=$(view_agents)
@@ -113,20 +114,15 @@ dash_main() {
         CURRENT_PROJECT="${result#view:sessions:}"
         CURRENT_VIEW="sessions"
         ;;
-      view:agent:*)
-        CURRENT_SESSION_ID="${result#view:agent:}"
+      view:session-agents:*)
+        CURRENT_SESSION_ID="${result#view:session-agents:}"
+        CURRENT_VIEW="session-agents"
+        ;;
+      view:agent:*:*)
+        local agent_payload="${result#view:agent:}"
+        CURRENT_SESSION_ID="${agent_payload%%:*}"
+        CURRENT_AGENT_NAME="${agent_payload#*:}"
         CURRENT_VIEW="agent"
-        ;;
-      view:detail)
-        if [[ -n "$CURRENT_SESSION_ID" ]]; then
-          CURRENT_VIEW="detail"
-        else
-          CURRENT_VIEW="projects"
-        fi
-        ;;
-      view:detail:*)
-        CURRENT_SESSION_ID="${result#view:detail:}"
-        CURRENT_VIEW="detail"
         ;;
       view:agents)
         CURRENT_VIEW="agents"
@@ -137,14 +133,10 @@ dash_main() {
       back)
         case "$CURRENT_VIEW" in
           agent)
-            CURRENT_VIEW="sessions"
+            CURRENT_VIEW="session-agents"
             ;;
-          detail)
-            if [[ -n "$CURRENT_PROJECT" ]]; then
-              CURRENT_VIEW="sessions"
-            else
-              CURRENT_VIEW="projects"
-            fi
+          session-agents)
+            CURRENT_VIEW="sessions"
             ;;
           sessions)
             CURRENT_VIEW="projects"
