@@ -24,7 +24,7 @@ import sqlite3
 import sys
 import time
 from datetime import datetime, timezone
-from pathlib import Path
+
 
 DB_PATH = os.path.expanduser("~/.local/share/opencode/opencode.db")
 
@@ -248,6 +248,78 @@ def cmd_sessions(args):
     conn.close()
 
 
+def cmd_session_agents(args):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        """
+        SELECT
+            json_extract(data, '$.agent') AS agent_name,
+            COUNT(*) AS msg_count,
+            SUM(COALESCE(json_extract(data, '$.tokens.input'), 0)) AS total_input,
+            SUM(COALESCE(json_extract(data, '$.tokens.output'), 0)) AS total_output
+        FROM message
+        WHERE session_id = ?
+          AND json_extract(data, '$.agent') IS NOT NULL
+          AND json_extract(data, '$.agent') != ''
+        GROUP BY agent_name
+        ORDER BY msg_count DESC
+        """,
+        (args.session_id,),
+    )
+    agent_rows = cursor.fetchall()
+
+    cursor.execute(
+        """
+        SELECT json_extract(data, '$.agent') AS agent_name,
+               json_extract(data, '$.role') AS role,
+               time_updated
+        FROM message
+        WHERE session_id = ?
+          AND id IN (
+            SELECT MAX(id) FROM message
+            WHERE session_id = ?
+              AND json_extract(data, '$.agent') IS NOT NULL
+            GROUP BY json_extract(data, '$.agent')
+          )
+        """,
+        (args.session_id, args.session_id),
+    )
+    last_msg_map = {}
+    for row in cursor.fetchall():
+        last_msg_map[row["agent_name"]] = (row["role"], row["time_updated"])
+
+    now_ms = int(time.time() * 1000)
+    for row in agent_rows:
+        agent_name = row["agent_name"]
+        msg_count = row["msg_count"]
+        total_input = row["total_input"] or 0
+        total_output = row["total_output"] or 0
+
+        last_role, last_time = last_msg_map.get(agent_name, ("", 0))
+        age_ms = now_ms - (last_time or 0)
+
+        if last_role == "assistant" and age_ms < 10 * 60 * 1000:
+            status = "running"
+        elif last_role == "user" and age_ms < 24 * 3600 * 1000:
+            status = "waiting"
+        else:
+            status = "idle"
+
+        print_tsv_row(
+            [
+                agent_name,
+                msg_count,
+                format_tokens(total_input),
+                format_tokens(total_output),
+                status,
+            ]
+        )
+
+    conn.close()
+
+
 def cmd_session_meta(args):
     """Show detailed metadata for a single session."""
     conn = get_connection()
@@ -341,8 +413,16 @@ def cmd_messages(args):
     conn = get_connection()
     cursor = conn.cursor()
 
-    cursor.execute(
-        """
+    where_clauses = ["m.session_id = ?"]
+    params = [args.session_id]
+
+    if args.agent is not None and args.agent != "":
+        where_clauses.append("json_extract(m.data, '$.agent') = ?")
+        params.append(args.agent)
+
+    params.append(args.limit)
+
+    query = f"""
         SELECT
             m.id,
             json_extract(m.data, '$.role') AS role,
@@ -353,12 +433,11 @@ def cmd_messages(args):
             COALESCE(json_extract(m.data, '$.modelID'), '') AS model,
             m.data
         FROM message m
-        WHERE m.session_id = ?
+        WHERE {" AND ".join(where_clauses)}
         ORDER BY m.time_created ASC
         LIMIT ?
-        """,
-        (args.session_id, args.limit),
-    )
+    """
+    cursor.execute(query, params)
     messages = cursor.fetchall()
 
     msg_ids = [m["id"] for m in messages]
@@ -896,10 +975,16 @@ def cmd_message_count(args):
     """Get message count for a session."""
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute(
-        "SELECT COUNT(*) FROM message WHERE session_id = ?",
-        (args.session_id,),
-    )
+
+    where_clauses = ["session_id = ?"]
+    params = [args.session_id]
+
+    if args.agent is not None and args.agent != "":
+        where_clauses.append("json_extract(data, '$.agent') = ?")
+        params.append(args.agent)
+
+    query = f"SELECT COUNT(*) FROM message WHERE {' AND '.join(where_clauses)}"
+    cursor.execute(query, params)
     count = cursor.fetchone()[0]
     print(count)
     conn.close()
@@ -971,10 +1056,16 @@ def build_parser():
     p_meta = subparsers.add_parser("session-meta", help="Session metadata")
     p_meta.add_argument("session_id", type=str, help="Session ID")
 
+    p_sagents = subparsers.add_parser("session-agents", help="List agents in a session")
+    p_sagents.add_argument("session_id", type=str, help="Session ID")
+
     p_msgs = subparsers.add_parser("messages", help="List messages in a session")
     p_msgs.add_argument("session_id", type=str, help="Session ID")
     p_msgs.add_argument(
         "--limit", type=int, default=200, help="Max results (default: 200)"
+    )
+    p_msgs.add_argument(
+        "--agent", type=str, default=None, help="Filter by agent name"
     )
 
     p_msgd = subparsers.add_parser("message-detail", help="Full message with parts")
@@ -1004,12 +1095,15 @@ def build_parser():
 
     subparsers.add_parser("todo-stats", help="Todo counts by status and priority")
 
-    p_pstats = subparsers.add_parser(
+    subparsers.add_parser(
         "project-stats", help="Project list with session counts"
     )
 
     p_count = subparsers.add_parser("message-count", help="Message count for session")
     p_count.add_argument("session_id", type=str, help="Session ID")
+    p_count.add_argument(
+        "--agent", type=str, default=None, help="Filter by agent name"
+    )
 
     p_status = subparsers.add_parser("agent-status", help="Agent status for session")
     p_status.add_argument("session_id", type=str, help="Session ID")
@@ -1029,6 +1123,7 @@ def main():
     command_map = {
         "sessions": cmd_sessions,
         "session-meta": cmd_session_meta,
+        "session-agents": cmd_session_agents,
         "messages": cmd_messages,
         "message-detail": cmd_message_detail,
         "agent-stats": cmd_agent_stats,
