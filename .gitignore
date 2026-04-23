@@ -4,3 +4,5 @@ __pycache__/
 .sisyphus/
 .opencode/
 .worktrees/
+tasks/
+tasks.md
